@@ -32,6 +32,7 @@ const SellerLoginScreen = ({ navigation }) => {
         placeholder="Name"
         value={name}
         onChangeText={setName}
+        placeholderTextColor="#aaa"
       />
       <TextInput
         style={styles.input}
@@ -41,8 +42,11 @@ const SellerLoginScreen = ({ navigation }) => {
         keyboardType="numeric"
         maxLength={6}
         secureTextEntry
+        placeholderTextColor="#aaa"
       />
-      <Button title="Login" onPress={handleLogin} />
+      <View style={styles.buttonContainer}>
+        <Button title="Login" onPress={handleLogin} color="#3A5A40" />
+      </View>
     </View>
   );
 };
@@ -52,21 +56,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
+    backgroundColor: '#F0F8FF',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: '#3A5A40',
+    marginBottom: 20,
   },
   input: {
-    width: '80%',
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 12,
-    paddingHorizontal: 10,
+    width: '90%',
+    height: 50,
+    borderColor: '#3A5A40',
+    borderWidth: 2,
+    borderRadius: 10,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    fontSize: 18,
+    backgroundColor: '#FFF',
+    color: '#333',
+  },
+  buttonContainer: {
+    width: '90%',
+    marginTop: 20,
   },
 });
 
