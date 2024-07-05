@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Dimensions, Alert } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import axios from 'axios';
 
 const BuyerRegisterScreen = () => {
   const [name, setName] = useState('');
+  const [pin,setPIN] = useState(0)
   const [phone, setPhone] = useState('');
+  const [email,setEmail] = useState('')
   const [aadhar, setAadhar] = useState('');
   const [location, setLocation] = useState(null);
   const [gst, setGst] = useState('');
@@ -34,8 +37,18 @@ const BuyerRegisterScreen = () => {
     })();
   }, []);
 
-  const handleRegister = () => {
+  const handleRegister = async() => {
     // Handle buyer registration logic here
+    const response = await axios.post("https://f2m-backend.onrender.com/buyer/register",{
+      Name:name,
+      PIN:Number(pin),
+      PhoneNumber:phone,
+      Email:email,
+      Address:"Banglore",
+      AadharNumber:aadhar,
+      GSTNumber:gst
+    })
+    Alert.alert(response.data.message)
     console.log('Buyer registered:', { name, phone, aadhar, location, gst });
   };
 
@@ -55,10 +68,25 @@ const BuyerRegisterScreen = () => {
       />
       <TextInput
         style={styles.input}
+        placeholder="PIN"
+        value={pin}
+        onChangeText={setPIN}
+        keyboardType="number-pad"
+        placeholderTextColor="#aaa"
+      />
+      <TextInput
+        style={styles.input}
         placeholder="Phone Number"
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
+        placeholderTextColor="#aaa"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        value={email}
+        onChangeText={setEmail}
         placeholderTextColor="#aaa"
       />
       <TextInput

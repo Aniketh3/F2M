@@ -1,26 +1,29 @@
 // components/SellerLoginScreen.js
+import axios from 'axios';
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
 
-const dummyCredentials = {
-  Seller: { username: 'seller123', pin: '123456' },
-};
 
 const SellerLoginScreen = ({ navigation }) => {
   const [name, setName] = useState('');
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(0);
 
-  const handleLogin = () => {
+  const handleLogin = async() => {
     if (pin.length !== 6) {
       Alert.alert('Error', 'PIN must be 6 digits');
       return;
     }
 
-    const credentials = dummyCredentials.Seller;
-    if (name === credentials.username && pin === credentials.pin) {
-      navigation.replace('SellerTabs');
-    } else {
-      Alert.alert('Error', 'Invalid username or PIN');
+    else{
+      const response = await axios.post("https://f2m-backend.onrender.com/seller/login",{
+        Name:name,
+        PIN:Number(pin)
+      })
+      console.log(response)
+      if(response.status===200){
+        Alert.alert(response.data.message)
+        navigation.replace("SellerTabs")
+      }
     }
   };
 

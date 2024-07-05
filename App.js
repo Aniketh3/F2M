@@ -55,7 +55,7 @@ function FarmerTabs() {
         },
       }}
     >
-      <Tab.Screen name="Home" component={SellerHomeScreen} />
+      <Tab.Screen name="SHome" component={SellerHomeScreen} />
       <Tab.Screen name="Orders" component={OrdersScreen} />
       <Tab.Screen name="Bids" component={BidsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -92,8 +92,7 @@ function BuyerTabs() {
         },
       }}
     >
-      <Tab.Screen name="Home" component={BuyerHomeScreen} />
-      <Tab.Screen name="Orders" component={OrdersScreen} />
+      <Tab.Screen name="BHome" component={BuyerHomeScreen} />
       <Tab.Screen name="Bids" component={BidsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

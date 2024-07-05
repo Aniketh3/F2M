@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Dimensions, Alert } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
-
+import axios from 'axios'
 const SellerRegisterScreen = () => {
   const [name, setName] = useState('');
+  const [pin,setPIN]  = useState(0)
   const [phone, setPhone] = useState('');
   const [aadhar, setAadhar] = useState('');
   const [location, setLocation] = useState(null);
@@ -34,9 +35,19 @@ const SellerRegisterScreen = () => {
     })();
   }, []);
 
-  const handleRegister = () => {
+  const handleRegister = async() => {
     // Handle seller registration logic here
+    const response = await axios.post("https://f2m-backend.onrender.com/seller/register",{
+      Name:name,
+      PIN:Number(pin),
+      PhoneNumber:phone,
+      Address:"Banglore",
+      AadharNumber:aadhar,
+      FruitsID:fruitsId
+    })
     console.log('Seller registered:', { name, phone, aadhar, location, fruitsId });
+    console.log(response)
+    Alert.alert(response.data.message)
   };
 
   const handleMapPress = (e) => {
@@ -51,6 +62,13 @@ const SellerRegisterScreen = () => {
         placeholder="Name"
         value={name}
         onChangeText={setName}
+        placeholderTextColor="#aaa"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="PIN"
+        value={pin}
+        onChangeText={setPIN}
         placeholderTextColor="#aaa"
       />
       <TextInput
