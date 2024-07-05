@@ -18,10 +18,17 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.aravindkvishwanath.Farm2Market"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b2152b06-f745-411c-a465-34cdb4064e12"
+      }
+    },
+    "owner": "aravindkvishwanath"
   }
 }
