@@ -1,0 +1,43 @@
+node_modules
+# Hardhat / Ethereum stuff
+artifacts/
+cache/
+coverage/
+coverage.json
+
+# Deployment / config files with secrets
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node / JS ecosystem
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.pnp*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Editor / OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test artifacts (if you generate them)
+test-results/
+test-coverage/
+
+# Optional - if you create these
+ignition/deployments/
+broadcast/
