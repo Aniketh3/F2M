@@ -194,22 +194,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)', // Semi-transparent white overlay
+    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Semi-transparent white overlay
     padding: 16,
     width: '100%',
   },
   logo: {
     width: 150,
     height: 150,
-    marginBottom: 20,
+    marginBottom: 70,
     borderRadius:80,
   },
   title: {
-    fontSize: 28,
+    fontSize: 25,
     fontWeight: 'bold',
     margin: 16,
     // color: '#3A5A40',
     color: '#000',
+    marginTop:60,
+    marginBottom:50
   },
   buttonRow: {
     flexDirection: 'row',

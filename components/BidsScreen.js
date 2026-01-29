@@ -1,119 +1,197 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
 
-const data = [
-  {
-    id: '1',
-    item: 'Apples',
-    eligibleQty: 6,
-    totalAmount: 2114.65,
-    profitLoss: 3417.25,
-  },
-  {
-    id: '2',
-    item: 'Oranges',
-    eligibleQty: 15,
-    totalAmount: 570.10,
-    profitLoss: -58.50,
-  },
-  {
-    id: '3',
-    item: 'Bananas',
-    eligibleQty: 3,
-    totalAmount: 2109.76,
-    profitLoss: 1677.10,
-  },
-  {
-    id: '4',
-    item: 'Grapes',
-    eligibleQty: 32,
-    totalAmount: 185.57,
-    profitLoss: -252.00,
-  },
-];
+const BiddingScreen = () => {
+  const [sellerPrice, setSellerPrice] = useState('');
+  const [buyerBid, setBuyerBid] = useState('');
+  const [buyerName, setBuyerName] = useState('');
+  const [bids, setBids] = useState([]);
+  const [winningBid, setWinningBid] = useState(null);
+  const [winnerDeclared, setWinnerDeclared] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(60); // 60 seconds time limit
+  const intervalRef = useRef(null);
 
-const BidsScreen = () => {
-  const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      <View style={styles.itemHeader}>
-        <Text style={styles.itemTitle}>{item.item.toUpperCase()}</Text>
-        <Text style={styles.itemQty}>Eligible qty {item.eligibleQty} kgs</Text>
-      </View>
-      <View style={styles.itemDetails}>
-        <Text style={styles.itemTotal}>Total amount {item.totalAmount.toFixed(2)}</Text>
-        <Text style={[styles.itemPL, item.profitLoss >= 0 ? styles.profit : styles.loss]}>
-          {item.profitLoss >= 0 ? '+' : ''}{item.profitLoss.toFixed(2)}
-        </Text>
-      </View>
-    </View>
-  );
+  useEffect(() => {
+    if (bids.length > 0) {
+      determineWinningBid(bids);
+    }
+  }, [bids]);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setTimeLeft(prevTime => {
+        if (prevTime <= 1) {
+          clearInterval(intervalRef.current);
+          if (!winnerDeclared) {
+            determineFinalWinner();
+          }
+          return 0;
+        }
+        return prevTime - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(intervalRef.current);
+  }, []);
+
+  const handleBidSubmit = () => {
+    if (timeLeft > 0 && buyerName && buyerBid) {
+      const newBid = { id: bids.length + 1, name: buyerName, bid: parseFloat(buyerBid) };
+      const updatedBids = [...bids, newBid];
+      setBids(updatedBids);
+      setBuyerName('');
+      setBuyerBid('');
+    } else {
+      Alert.alert('Time Up', 'Bid submission is closed as time is up.');
+    }
+  };
+
+  const determineWinningBid = (bids) => {
+    if (bids.length > 0) {
+      const highestBid = bids.reduce((max, bid) => (bid.bid > max.bid ? bid : max), bids[0]);
+      setWinningBid(highestBid);
+      if (highestBid.bid >= parseFloat(sellerPrice) * 1.15 && !winnerDeclared) {
+        setWinnerDeclared(true);
+        Alert.alert('Winner Declared', `${highestBid.name} wins the bid with $${highestBid.bid.toFixed(2)}`);
+      }
+    }
+  };
+
+  const determineFinalWinner = () => {
+    if (bids.length > 0) {
+      const highestBid = bids.reduce((max, bid) => (bid.bid > max.bid ? bid : max), bids[0]);
+      setWinningBid(highestBid);
+      setWinnerDeclared(true);
+      Alert.alert('Time Up', `${highestBid.name} wins the bid with $${highestBid.bid.toFixed(2)}`);
+    } else {
+      Alert.alert('Time Up', 'No bids were placed.');
+    }
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={data}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        // ListHeaderComponent={() => (
-        //   <View style={styles.header}>
-        //     <Text style={styles.headerText}>Bids</Text>
-        //   </View>
-        // )}
+      <Text style={styles.title}>Bidding Screen</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Seller's Price"
+        value={sellerPrice}
+        onChangeText={setSellerPrice}
+        keyboardType="numeric"
+        placeholderTextColor="#F0F0F0"
       />
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Your Name"
+        value={buyerName}
+        onChangeText={setBuyerName}
+        editable={timeLeft > 0}
+        placeholderTextColor="#F0F0F0"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Your Bid"
+        value={buyerBid}
+        onChangeText={setBuyerBid}
+        keyboardType="numeric"
+        editable={timeLeft > 0}
+        placeholderTextColor="#F0F0F0"
+      />
+      <TouchableOpacity 
+        style={[styles.button, { backgroundColor: timeLeft <= 0 ? '#B0B0B0' : '#FF5722' }]} 
+        onPress={handleBidSubmit}
+        disabled={timeLeft <= 0}
+      >
+        <Text style={styles.buttonText}>Submit Bid</Text>
+      </TouchableOpacity>
+      <FlatList
+        data={bids}
+        renderItem={({ item }) => (
+          <Text style={styles.bidItem}>
+            {item.name}: ${item.bid.toFixed(2)}
+          </Text>
+        )}
+        keyExtractor={item => item.id.toString()}
+        style={styles.bidsList}
+      />
+      {winningBid && (
+        <Text style={styles.winningBid}>
+          Current Winning Bid: {winningBid.name} with ${winningBid.bid.toFixed(2)}
+        </Text>
+      )}
+      <Text style={styles.timer}>Time Left: {formatTime(timeLeft)}</Text>
     </View>
   );
 };
 
+export default BiddingScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    padding: 20,
   },
-  header: {
-    padding: 16,
-    backgroundColor: '#000',
-  },
-  headerText: {
+  title: {
     fontSize: 24,
-    color: '#fff',
     fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 20,
   },
-  itemContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000',
+  input: {
+    width: '90%',
+    height: 50,
+    borderColor: '#1B5E20',
+    borderWidth: 2,
+    borderRadius: 10,
+    marginBottom: 10,
+    paddingHorizontal: 15,
+    backgroundColor: '#FFF',
+    color: '#333',
   },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  button: {
+    width: '90%',
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  itemTitle: {
+  buttonText: {
+    color: '#000',
     fontSize: 18,
-    color: '#000',
     fontWeight: 'bold',
   },
-  itemQty: {
+  bidItem: {
+    color: '#1B5E20',
     fontSize: 16,
-    color: '#000',
+    padding: 10,
+    backgroundColor: '#C8E6C9',
+    borderRadius: 5,
+    marginBottom: 5,
+    width: '90%',
+    textAlign: 'center',
   },
-  itemDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+  bidsList: {
+    width: '100%',
+    marginVertical: 20,
   },
-  itemTotal: {
-    fontSize: 16,
-    color: '#000',
+  winningBid: {
+    marginTop: 20,
+    color: '#FFEB3B',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
-  itemPL: {
-    fontSize: 16,
-  },
-  profit: {
-    color: 'green',
-  },
-  loss: {
-    color: 'red',
+  timer: {
+    marginTop: 20,
+    color: '#D32F2F',
+    fontSize: 18,
   },
 });
-
-export default BidsScreen;

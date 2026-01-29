@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, ScrollView, Dimensions, Alert } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import axios from 'axios';
 
 const SellerRegisterScreen = () => {
   const [name, setName] = useState('');
+  const [pin,setPIN] = useState(0)
   const [phone, setPhone] = useState('');
   const [aadhar, setAadhar] = useState('');
   const [location, setLocation] = useState(null);
@@ -32,6 +34,7 @@ const SellerRegisterScreen = () => {
         longitude: coords.longitude,
       });
     })();
+    
   }, []);
 
   const handleRegister = () => {
@@ -51,6 +54,13 @@ const SellerRegisterScreen = () => {
         placeholder="Name"
         value={name}
         onChangeText={setName}
+        placeholderTextColor="#aaa"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Set PIN"
+        value={pin}
+        onChangeText={setPIN}
         placeholderTextColor="#aaa"
       />
       <TextInput

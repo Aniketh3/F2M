@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
 
 const OrdersScreen = () => {
   const [sellItems, setSellItems] = useState('');
@@ -8,70 +8,94 @@ const OrdersScreen = () => {
   const [totalAmount, setTotalAmount] = useState('');
 
   const handleOrder = () => {
-    // Calculate total amount
     const total = parseFloat(sellQuantity) * parseFloat(saleAmount);
     setTotalAmount(total.toString());
-
-    // Show alert after setting total amount
     Alert.alert('Order Submitted', 'Your order has been submitted successfully!');
   };
 
+  const handleBid = () => {
+    const total = parseFloat(sellQuantity) * parseFloat(saleAmount);
+    setTotalAmount(total.toString());
+    Alert.alert('Bid Submitted', 'Your bid has been submitted successfully!');
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Orders</Text>
       <TextInput
         style={styles.input}
         placeholder="Sell Items"
         value={sellItems}
         onChangeText={setSellItems}
+        placeholderTextColor="#aaa"
       />
       <TextInput
         style={styles.input}
-        placeholder="Sell Quantity(in kgs)"
+        placeholder="Sell Quantity (in kgs)"
         value={sellQuantity}
         onChangeText={setSellQuantity}
         keyboardType="numeric"
+        placeholderTextColor="#aaa"
       />
       <TextInput
         style={styles.input}
-        placeholder="Sale Amount(in Rs) "
+        placeholder="Sale Amount (in Rs)"
         value={saleAmount}
         onChangeText={setSaleAmount}
         keyboardType="numeric"
+        placeholderTextColor="#aaa"
       />
-      <Button title="Submit Order" onPress={handleOrder} />
+      <View style={styles.buttonContainer}>
+        <Button title="Submit Order" onPress={handleOrder} color="#3A5A40" />
+      </View>
       {totalAmount !== '' && (
         <Text style={styles.totalAmountText}>Total Amount: ₹{totalAmount}</Text>
       )}
-    </View>
+      <View style={styles.buttonContainer}>
+        <Button title="Submit Bid" onPress={handleBid} color="#3A5A40" />
+      </View>
+      {totalAmount !== '' && (
+        <Text style={styles.totalAmountText}>Total Amount: ₹{totalAmount}</Text>
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
+    backgroundColor: '#F0F8FF',
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: '#3A5A40',
+    marginBottom: 20,
   },
   input: {
-    width: '80%',
-    height: 40,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    marginBottom: 12,
-    paddingHorizontal: 10,
+    width: '90%',
+    height: 50,
+    borderColor: '#3A5A40',
+    borderWidth: 2,
+    borderRadius: 10,
+    marginBottom: 15,
+    paddingHorizontal: 15,
+    fontSize: 18,
+    backgroundColor: '#FFF',
+    color: '#333',
+  },
+  buttonContainer: {
+    width: '90%',
+    marginTop: 20,
   },
   totalAmountText: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginVertical: 12,
+    color: '#3A5A40',
+    marginVertical: 20,
   },
 });
 
