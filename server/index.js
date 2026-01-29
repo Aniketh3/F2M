@@ -6,6 +6,7 @@ const app = express()
 const jwt = require('jsonwebtoken');
 const mongoose= require('mongoose')
 const bodyParser = require('body-parser')
+const escrowRoutes = require('./routes/escrow')
 const SECRET_KEY = 'Farm2Market'; // Replace with your secret key
 // Allow CORS only from the frontend port (adjust origin as needed)
 app.use(cors({
@@ -245,6 +246,11 @@ app.post("/market-search",async(req,res)=>{
         res.status(500).json({message:"Couldnt place Search"})
     }
 })
+
+// ============================================================================
+// BLOCKCHAIN/ESCROW ROUTES
+// ============================================================================
+app.use('/escrow', escrowRoutes);
 
 app.listen(3000,()=>{
     console.log("Server up and running")
