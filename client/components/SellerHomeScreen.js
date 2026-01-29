@@ -1,6 +1,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import axios from 'axios';
 
 const SellerHomeScreen = () => {
 
@@ -43,6 +46,13 @@ const SellerHomeScreen = () => {
     getSellerInfo();
     fetchSales();
   }, []);
+
+  // Ensure fetchSales is called when refreshing is triggered by FlatList
+  useEffect(() => {
+    if (refreshing) {
+      fetchSales();
+    }
+  }, [refreshing]);
 
   const handleAddSale = async () => {
     if (!sellItem || !sellQuantity || !saleAmount) {
@@ -126,7 +136,7 @@ const SellerHomeScreen = () => {
           onRefresh={fetchSales}
           ListEmptyComponent={<Text style={{color:'#888',marginTop:20}}>No sales yet.</Text>}
           contentContainerStyle={{paddingBottom: 40}}
-          style={{width: '100%'}}
+          style={{flex: 1}}
         />
       </View>
     </KeyboardAvoidingView>
