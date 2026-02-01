@@ -34,7 +34,7 @@ const BuyerHomeScreenWithBlockchain = () => {
     penaltyPercent: '10',
   });
 
-  const backend = 'http://192.168.0.101:3000';
+  const backend = 'http://10.140.10.251:3000';
   
   // Buyer's wallet address (should come from login/auth context in real app)
   const buyerAddress = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'; // Hardhat test account

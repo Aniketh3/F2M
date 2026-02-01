@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Animated,
+  Dimensions,
+  StatusBar,
+  Easing,
+} from 'react-native';
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Image, StyleSheet, View, Text, TouchableOpacity, ImageBackground } from 'react-native';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Importing Components
+// SCREENS (Keep your existing file imports here)
 import SellerRegisterScreen from './components/SellerRegisterScreen';
 import BuyerRegisterScreen from './components/BuyerRegisterScreen';
 import SellerLoginScreen from './components/SellerLoginScreen';
@@ -14,51 +26,304 @@ import SellerHomeScreen from './components/SellerHomeScreen';
 import BuyerHomeScreen from './components/BuyerHomeScreen';
 import OrdersScreen from './components/OrdersScreen';
 import ProfileScreen from './components/ProfileScreen';
-import BidsScreen from './components/BidsScreen'; // Importing the BidsScreen
+import BidsScreen from './components/BidsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const LogoTitle = () => (
-  <Image
-    style={styles.logo}
-    source={require('./assets/logo.jpeg')} // Replace with your actual logo path
-  />
+const { width, height } = Dimensions.get('window');
+
+/* ===========================
+   🎨 PREMIUM DESIGN SYSTEM
+=========================== */
+const COLORS = {
+  primary: '#10B981',    // Emerald Green (Seller)
+  secondary: '#F59E0B',  // Amber Orange (Buyer)
+  background: '#F8FAFC', // Premium Off-White
+  textMain: '#111827',   
+  textSec: '#64748B',    
+  white: '#FFFFFF',
+};
+
+const SHADOWS = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  button: {
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  }
+};
+
+/* ===========================
+   🍎 CONTINUOUS FLOATING ANIMATION (FIXED)
+=========================== */
+
+const floatingItems = [
+  require('./assets/fruits/apple.png'),
+  require('./assets/fruits/carrot.png'),
+  require('./assets/fruits/corn.png'),
+  require('./assets/fruits/grapes.png'),
+  require('./assets/fruits/almond.png'),
+  require('./assets/fruits/banana.png'),
+  require('./assets/fruits/onion.png'),
+  require('./assets/fruits/lettuce.png'),
+  require('./assets/fruits/tomato.png'),
+  require('./assets/fruits/pineapple.png'),
+  require('./assets/fruits/orange.png'),
+  require('./assets/fruits/mango.png'),
+];
+
+const FloatingItem = ({ source, duration, startY, scale }) => {
+  // 1. Start Randomly on screen so user sees fruits immediately
+  const initialX = Math.random() * width;
+  const translateX = useRef(new Animated.Value(initialX)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Calculate speed so the first run matches the loop speed
+    const totalDistance = width + 200; // -100 to width + 100
+    const velocity = totalDistance / duration; 
+    const remainingDistance = width + 100 - initialX;
+    const firstRunDuration = remainingDistance / velocity;
+
+    // MOVEMENT SEQUENCE
+    const floatSequence = Animated.sequence([
+      // Step 1: Finish current path (from random spot to right edge)
+      Animated.timing(translateX, {
+        toValue: width + 100,
+        duration: firstRunDuration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+      // Step 2: Loop forever from Left Edge (-100) -> Right Edge
+      Animated.loop(
+        Animated.sequence([
+          // Instant reset to left
+          Animated.timing(translateX, {
+            toValue: -100,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+          // Full float across
+          Animated.timing(translateX, {
+            toValue: width + 100,
+            duration: duration,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+        ])
+      ),
+    ]);
+
+    floatSequence.start();
+
+    // ROTATION LOOP
+    Animated.loop(
+      Animated.timing(rotate, {
+        toValue: 1,
+        duration: 15000 + Math.random() * 5000, // Randomize spin speed
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+
+  }, []);
+
+  const spin = rotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.Image
+      source={source}
+      style={[
+        styles.floatingItem,
+        {
+          top: startY,
+          transform: [
+            { translateX }, 
+            { rotate: spin },
+            { scale: scale }
+          ],
+        },
+      ]}
+    />
+  );
+};
+
+/* ===========================
+   🏠 HOME SCREEN
+=========================== */
+
+const HomeScreen = ({ navigation }) => {
+  const [role, setRole] = useState('seller');
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const handleRoleSwitch = (newRole) => {
+    if (role === newRole) return;
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0.96, duration: 100, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start();
+    setRole(newRole);
+  };
+
+  const handleAuth = (type) => {
+    const target = role === 'seller' 
+      ? (type === 'login' ? 'SellerLogin' : 'SellerRegister') 
+      : (type === 'login' ? 'BuyerLogin' : 'BuyerRegister');
+    navigation.navigate(target);
+  };
+
+  const isSeller = role === 'seller';
+  const activeColor = isSeller ? COLORS.primary : COLORS.secondary;
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      
+      {/* BACKGROUND BLOBS */}
+      <View style={styles.backgroundLayer}>
+        <View style={[styles.blob, styles.blobGreen]} />
+        <View style={[styles.blob, styles.blobOrange]} />
+      </View>
+
+      {/* ANIMATION LAYER */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        {floatingItems.map((item, index) => (
+          <FloatingItem 
+            key={index} 
+            source={item} 
+            // Slower, smoother speeds (15s to 30s)
+            duration={15000 + (index * 2000)} 
+            // FIXED: Distribute evenly within screen height
+            startY={(index * (height / floatingItems.length)) - 50} 
+            // Random scales
+            scale={0.6 + (index % 4) * 0.1}
+          />
+        ))}
+      </View>
+
+      {/* CONTENT LAYER */}
+      <View style={styles.contentContainer}>
+        
+        {/* Header */}
+        <View style={styles.headerBox}>
+          <View style={styles.logoContainer}>
+             <Image source={require('./assets/logo.jpeg')} style={styles.logo} />
+          </View>
+          <Text style={styles.appName}>Farm2Market</Text>
+          <Text style={styles.tagline}>Future of Fresh Trade</Text>
+        </View>
+
+        {/* Glass Card */}
+        <Animated.View style={[styles.glassCard, { transform: [{ scale: fadeAnim }] }]}>
+          
+          <Text style={styles.welcomeTitle}>
+            I am a <Text style={{ color: activeColor }}>{isSeller ? 'Seller' : 'Buyer'}</Text>
+          </Text>
+          
+          <Text style={styles.subText}>
+            {isSeller 
+              ? 'List crops, access markets, and grow your business.' 
+              : 'Buy fresh, organic produce directly from farmers.'}
+          </Text>
+
+          {/* Role Switcher */}
+          <View style={styles.selectorContainer}>
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              style={[styles.selectorBtn, isSeller && styles.selectorBtnActive]}
+              onPress={() => handleRoleSwitch('seller')}
+            >
+              <MaterialCommunityIcons 
+                name="sprout" 
+                size={20} 
+                color={isSeller ? COLORS.primary : '#94A3B8'} 
+              />
+              <Text style={[styles.selectorText, isSeller && styles.selectorTextActive]}>Seller</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              activeOpacity={0.9}
+              style={[styles.selectorBtn, !isSeller && styles.selectorBtnActive]}
+              onPress={() => handleRoleSwitch('buyer')}
+            >
+              <MaterialCommunityIcons 
+                name="basket-outline" 
+                size={20} 
+                color={!isSeller ? COLORS.secondary : '#94A3B8'} 
+              />
+              <Text style={[styles.selectorText, !isSeller && styles.selectorTextActive]}>Buyer</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Login Button */}
+          <TouchableOpacity 
+            style={[styles.mainButton, { backgroundColor: activeColor }]} 
+            onPress={() => handleAuth('login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.mainButtonText}>Login</Text>
+            <Feather name="arrow-right" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Register Link */}
+          <TouchableOpacity 
+            style={styles.secondaryButton} 
+            onPress={() => handleAuth('register')}
+          >
+            <Text style={styles.secondaryButtonText}>
+              New here? <Text style={{ color: activeColor, fontWeight: '700' }}>Create Account</Text>
+            </Text>
+          </TouchableOpacity>
+
+        </Animated.View>
+
+        <Text style={styles.footer}>
+          Fair Price • Direct Trade • Trusted
+        </Text>
+
+      </View>
+    </View>
+  );
+};
+
+/* ===========================
+   📱 TABS (Unchanged)
+=========================== */
+
+const TabIcon = ({ name, color, focused, label }) => (
+  <View style={[styles.tabItem, focused && { backgroundColor: color + '15' }]}>
+    <MaterialCommunityIcons name={name} size={24} color={color} />
+    <Text style={[styles.tabLabel, { color }]}>{label}</Text>
+  </View>
 );
 
-function FarmerTabs() {
+function SellerTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          if (route.name === 'Home') {
-            iconName = 'home';
-          } else if (route.name === 'Orders') {
-            iconName = 'list';
-          } else if (route.name === 'Bids') {
-            iconName = 'gavel';
-          } else if (route.name === 'Profile') {
-            iconName = 'user';
-          }
-          return <Icon name={iconName} size={size} color={color} />;
-        },
-      })}
-      tabBarOptions={{
-        activeTintColor: '#3A5A40',
-        inactiveTintColor: 'gray',
-        labelStyle: {
-          fontSize: 16, // Increase font size for tab labels
-        },
-        style: {
-          height: 70, // Increase height for tab bar to accommodate larger icons
-        },
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarStyle: styles.floatingTabBar,
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: '#94A3B8',
       }}
     >
-      <Tab.Screen name="Home" component={SellerHomeScreen} />
-      <Tab.Screen name="Orders" component={OrdersScreen} />
-      <Tab.Screen name="Bids" component={BidsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={SellerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="home-variant-outline" label="Home" {...p} /> }}/>
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="clipboard-text-outline" label="Orders" {...p} /> }}/>
+      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="gavel" label="Bids" {...p} /> }}/>
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label="Profile" {...p} /> }}/>
     </Tab.Navigator>
   );
 }
@@ -66,179 +331,248 @@ function FarmerTabs() {
 function BuyerTabs() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          if (route.name === 'Home') {
-            iconName = 'home';
-          } else if (route.name === 'Orders') {
-            iconName = 'list';
-          } else if (route.name === 'Bids') {
-            iconName = 'gavel';
-          } else if (route.name === 'Profile') {
-            iconName = 'user';
-          }
-          return <Icon name={iconName} size={size} color={color} />;
-        },
-      })}
-      tabBarOptions={{
-        activeTintColor: '#3A5A40',
-        inactiveTintColor: 'gray',
-        labelStyle: {
-          fontSize: 16, // Increase font size for tab labels
-        },
-        style: {
-          height: 70, // Increase height for tab bar to accommodate larger icons
-        },
+      screenOptions={{
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarStyle: styles.floatingTabBar,
+        tabBarActiveTintColor: COLORS.secondary,
+        tabBarInactiveTintColor: '#94A3B8',
       }}
     >
-      <Tab.Screen name="Home" component={BuyerHomeScreen} />
-      <Tab.Screen name="Orders" component={OrdersScreen} />
-      <Tab.Screen name="Bids" component={BidsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Home" component={BuyerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="storefront-outline" label="Market" {...p} /> }}/>
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="shopping-outline" label="Orders" {...p} /> }}/>
+      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="ticket-percent-outline" label="Bids" {...p} /> }}/>
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label="Profile" {...p} /> }}/>
     </Tab.Navigator>
   );
 }
 
-const HomeScreen = ({ navigation }) => (
-  <ImageBackground
-    source={require('./assets/background.jpeg')} // Replace with your actual background image path
-    style={styles.background}
-  >
-    <View style={styles.overlay}>
-      <LogoTitle />
-      <Text style={styles.title}>Welcome to Farm2Market</Text>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.button, styles.registerButton]}
-          onPress={() => navigation.navigate('SellerRegister')}
-        >
-          <Text style={styles.buttonText}>Register as Seller</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.loginButton]}
-          onPress={() => navigation.navigate('SellerLogin')}
-        >
-          <Text style={styles.buttonText}>Login as Seller</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.button, styles.registerButton]}
-          onPress={() => navigation.navigate('BuyerRegister')}
-        >
-          <Text style={styles.buttonText}>Register as Buyer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.loginButton]}
-          onPress={() => navigation.navigate('BuyerLogin')}
-        >
-          <Text style={styles.buttonText}>Login as Buyer</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </ImageBackground>
-);
+/* ===========================
+   🚀 APP ROOT
+=========================== */
 
-const App = () => (
-  <NavigationContainer>
-    <Stack.Navigator>
-      <Stack.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{ headerShown:false}}
-      />
-      <Stack.Screen
-        name="SellerRegister"
-        component={SellerRegisterScreen}
-        options={{ title: 'Seller Register' }}
-      />
-      <Stack.Screen
-        name="BuyerRegister"
-        component={BuyerRegisterScreen}
-        options={{ title: 'Buyer Register' }}
-      />
-      <Stack.Screen
-        name="SellerLogin"
-        component={SellerLoginScreen}
-        options={{ title: 'Seller Login' }}
-      />
-      <Stack.Screen
-        name="BuyerLogin"
-        component={BuyerLoginScreen}
-        options={{ title: 'Buyer Login' }}
-      />
-      <Stack.Screen
-        name="SellerTabs"
-        component={FarmerTabs} // Use FarmerTabs for Seller
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="BuyerTabs"
-        component={BuyerTabs}
-        options={{ headerShown: false }}
-      />
-    </Stack.Navigator>
-  </NavigationContainer>
-);
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="SellerRegister" component={SellerRegisterScreen} />
+        <Stack.Screen name="BuyerRegister" component={BuyerRegisterScreen} />
+        <Stack.Screen name="SellerLogin" component={SellerLoginScreen} />
+        <Stack.Screen name="BuyerLogin" component={BuyerLoginScreen} />
+        <Stack.Screen name="SellerTabs" component={SellerTabs} />
+        <Stack.Screen name="BuyerTabs" component={BuyerTabs} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+/* ===========================
+   ✨ STYLES (Clean & Corporate)
+=========================== */
 
 const styles = StyleSheet.create({
-  background: {
+  container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
+    backgroundColor: COLORS.background,
   },
-  overlay: {
+
+  // BACKGROUND MESH BLOBS
+  backgroundLayer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+    zIndex: -1,
+    overflow: 'hidden',
+  },
+  blob: {
+    position: 'absolute',
+    width: width * 1.2,
+    height: width * 1.2,
+    borderRadius: width,
+    opacity: 0.12,
+  },
+  blobGreen: {
+    top: -width * 0.5,
+    left: -width * 0.5,
+    backgroundColor: COLORS.primary,
+  },
+  blobOrange: {
+    bottom: -width * 0.4,
+    right: -width * 0.5,
+    backgroundColor: COLORS.secondary,
+  },
+
+  // FLOATING ITEMS
+  floatingItem: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+    opacity: 0.65, 
+    zIndex: 1,
+  },
+
+  // CONTENT
+  contentContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.3)', // Semi-transparent white overlay
-    padding: 16,
-    width: '100%',
+    paddingHorizontal: 24,
+    zIndex: 10,
+  },
+
+  // HEADER
+  headerBox: {
+    alignItems: 'center',
+    marginBottom: 35,
+  },
+  logoContainer: {
+    backgroundColor: COLORS.white,
+    padding: 4,
+    borderRadius: 24,
+    ...SHADOWS.card,
+    marginBottom: 16,
   },
   logo: {
-    width: 150,
-    height: 150,
-    marginBottom: 70,
-    borderRadius:80,
+    width: 80,
+    height: 80,
+    borderRadius: 20,
   },
-  title: {
-    fontSize: 25,
-    fontWeight: 'bold',
-    margin: 16,
-    // color: '#3A5A40',
-    color: '#000',
-    marginTop:60,
-    marginBottom:50
+  appName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: COLORS.textMain,
+    letterSpacing: -0.5,
   },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 10,
+  tagline: {
+    fontSize: 14,
+    color: COLORS.textSec,
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+
+  // GLASS CARD
+  glassCard: {
     width: '100%',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 32,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    ...SHADOWS.card,
   },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginHorizontal: 5,
-    width: '45%',
-    elevation: 5, // Add shadow effect for buttons
+  welcomeTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.textMain,
+    marginBottom: 10,
   },
-  registerButton: {
-    backgroundColor: '#4CAF50',
-  },
-  loginButton: {
-    backgroundColor: '#2196F3',
-  },
-  buttonText: {
-    color: '#FFFFFF',
+  subText: {
+    fontSize: 14,
+    color: COLORS.textSec,
     textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginBottom: 24,
+    lineHeight: 22,
+    paddingHorizontal: 10,
+  },
+
+  // SWITCHER PILL
+  selectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    padding: 5,
+    width: '100%',
+    marginBottom: 24,
+  },
+  selectorBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 8,
+  },
+  selectorBtnActive: {
+    backgroundColor: COLORS.white,
+    ...SHADOWS.card,
+    shadowOpacity: 0.05,
+    elevation: 2,
+  },
+  selectorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  selectorTextActive: {
+    color: COLORS.textMain,
+    fontWeight: '700',
+  },
+
+  // BUTTONS
+  mainButton: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 18,
+    gap: 8,
+    ...SHADOWS.button,
+  },
+  mainButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    marginTop: 20,
+    paddingVertical: 4,
+  },
+  secondaryButtonText: {
+    fontSize: 14,
+    color: COLORS.textSec,
+  },
+
+  // FOOTER
+  footer: {
+    position: 'absolute',
+    bottom: 30,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+
+  // TABS
+  floatingTabBar: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    height: 70,
+    borderTopWidth: 0,
+    ...SHADOWS.card,
+    paddingHorizontal: 8, // Added padding for better spacing
+    borderWidth: 0.5,
+    borderColor: '#E2E8F0', // Subtle border for professionalism
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
-
-export default App;
