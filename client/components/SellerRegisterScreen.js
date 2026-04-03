@@ -125,7 +125,7 @@ const SellerRegisterScreen = ({ navigation }) => {
       };
 
       // REPLACE WITH YOUR IP
-      await axios.post('http://10.140.10.251:3000/seller/register', payload);
+      await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/seller/register`, payload);
       
       Alert.alert('Welcome Aboard', 'Your farm has been registered successfully.', [
         { text: 'Login Now', onPress: () => navigation.replace('SellerLogin') }

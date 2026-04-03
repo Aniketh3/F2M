@@ -51,6 +51,17 @@ const sellList = new mongoose.Schema({
     }
 })
 
+const notificationSchema = new mongoose.Schema({
+    type: { type: String, default: "BuyRequest" },
+    message: { type: String },
+    buyerName: { type: String },
+    buyerPhone: { type: String },
+    orderID: { type: String },
+    itemName: { type: String },
+    status: { type: String, default: 'Pending' }, 
+    date: { type: Date, default: Date.now }
+})
+
 const sellerSchema = new mongoose.Schema({
     Name:{
         type:String,
@@ -86,6 +97,10 @@ const sellerSchema = new mongoose.Schema({
         type:[sellList],
         default:[],
         required:true
+    },
+    Notifications:{
+        type:[notificationSchema],
+        default:[]
     }
 
 })

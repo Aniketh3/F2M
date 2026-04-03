@@ -52,7 +52,7 @@ const SellerLoginScreen = ({ navigation }) => {
     
     try {
       // Use your actual IP address here
-      const backendUrl = 'http://10.140.10.251:3000/seller/login';
+      const backendUrl = `${process.env.EXPO_PUBLIC_API_URL}/seller/login`;
       const payload = { Name: name, PIN: Number(pin) };
       
       const response = await axios.post(backendUrl, payload);

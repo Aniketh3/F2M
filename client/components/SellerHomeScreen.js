@@ -22,9 +22,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
+import QRCode from 'react-native-qrcode-svg';
 
 // 🔧 CONFIG
-const BACKEND_URL = 'http://10.140.10.251:3000'; // Replace with your IP
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const COLORS = {
   primary: '#10B981',     
@@ -57,6 +58,15 @@ const SellerHomeScreen = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  
+  // Custom states added for QR and Notifs
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [createdQRData, setCreatedQRData] = useState('');
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [manualOrderID, setManualOrderID] = useState('');
+  
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifModal, setShowNotifModal] = useState(false);
 
   useFocusEffect(
     useCallback(() => { fetchData(); }, [])
@@ -76,6 +86,7 @@ const SellerHomeScreen = () => {
     try {
       const res = await axios.get(`${BACKEND_URL}/sellerSaleList?username=${name}`);
       setMySales((res.data.seller || []).reverse());
+      setNotifications((res.data.notifications || []).reverse());
     } catch (e) {
       console.log(e);
     } finally {
@@ -98,6 +109,23 @@ const SellerHomeScreen = () => {
     });
     if (!result.canceled) setImage(result.assets[0].uri);
   };
+
+  // Notification Response
+  const handleNotifResponse = async (notif, status) => {
+    try {
+        await axios.post(`${BACKEND_URL}/respondBuyRequest`, {
+            sellerName: sellerName,
+            buyerName: notif.buyerName,
+            orderID: notif.orderID,
+            itemName: notif.itemName,
+            status: status
+        });
+        Alert.alert("Success", `Request ${status}!`);
+        fetchSales(sellerName);
+    } catch(e) {
+        Alert.alert("Error", "Action failed.");
+    }
+  }
 
   // ✏️ OPEN EDIT MODAL
   const openEditModal = (item) => {
@@ -143,6 +171,63 @@ const SellerHomeScreen = () => {
     );
   };
 
+  // 📷 SCAN QR FROM GALLERY OR MANUAL OVERRIDE
+  const handleOpenScan = () => {
+    setManualOrderID('');
+    setShowScanModal(true);
+  };
+
+  const handleManualTransit = async () => {
+     if (!manualOrderID.trim()) return;
+     try {
+        setLoading(true);
+        await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, {
+            orderID: manualOrderID.trim(),
+            sellerName: sellerName,
+            status: "In Transit"
+        });
+        Alert.alert("Transit Started", "Status updated successfully.");
+        setShowScanModal(false);
+        fetchSales(sellerName);
+     } catch (e) {
+        Alert.alert("Error", "Could not mark as Transit. Check Order ID.");
+     } finally { setLoading(false); }
+  }
+
+  const handleScanQR = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert("Access Denied", "Gallery permission is required to scan QR.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      base64: true,
+      quality: 1,
+    });
+    if (!result.canceled && result.assets[0].base64) {
+      try {
+        setLoading(true);
+        const res = await axios.post(`${BACKEND_URL}/decode-qr`, { imageBase64: result.assets[0].base64 });
+        const qrData = JSON.parse(res.data.data);
+        
+        await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, {
+            orderID: qrData.orderID,
+            sellerName: qrData.sellerName || sellerName,
+            status: "In Transit"
+        });
+        
+        Alert.alert("Transit Started", "Status updated to 'In Transit'.");
+        setShowScanModal(false);
+        fetchSales(sellerName);
+      } catch (err) {
+        Alert.alert("Scan Failed", err.response?.data?.message || "Invalid QR Code or Request.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   // 🚀 SUBMIT (ADD OR UPDATE)
   const handleSubmit = async () => {
     if (!sellItem || !sellQuantity || !saleAmount) {
@@ -162,11 +247,16 @@ const SellerHomeScreen = () => {
         Alert.alert('Success', 'Listing updated successfully!');
       } else {
         // CREATE NEW
-        await axios.post(`${BACKEND_URL}/sellerSale?username=${sellerName}`, {
+        const res = await axios.post(`${BACKEND_URL}/sellerSale?username=${sellerName}`, {
           SellItem: sellItem,
           SellQuantity: Number(sellQuantity),
           SaleAmount: Number(saleAmount),
         });
+        const newOrderID = res.data.orderID;
+        if (newOrderID) {
+            setCreatedQRData(JSON.stringify({ orderID: newOrderID, sellerName }));
+            setShowQRModal(true);
+        }
         Alert.alert('Success', 'New produce listed!');
       }
       
@@ -174,7 +264,7 @@ const SellerHomeScreen = () => {
       fetchSales(sellerName);
 
     } catch (e) {
-      Alert.alert('Error', 'Operation failed. Please try again.');
+        Alert.alert('Error', 'Operation failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -219,8 +309,8 @@ const SellerHomeScreen = () => {
         <View style={styles.verticalDivider} />
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Status</Text>
-          <Text style={[styles.statValue, { color: item.isTransactionComplete ? COLORS.success : '#F59E0B' }]}>
-            {item.isTransactionComplete ? 'Sold' : 'Active'}
+          <Text style={[styles.statValue, { color: item.isTransactionComplete ? COLORS.success : (item.TransactionStatus === 'In Transit' ? COLORS.primary : '#F59E0B') }]}>
+            {item.isTransactionComplete ? 'Sold' : (item.TransactionStatus || 'Pending')}
           </Text>
         </View>
       </View>
@@ -238,10 +328,20 @@ const SellerHomeScreen = () => {
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text>
           </View>
-          <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-            <Feather name="plus" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Add</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={styles.addButton} onPress={() => setShowNotifModal(true)}>
+              <MaterialCommunityIcons name="bell" size={20} color="#fff" />
+              {notifications.length > 0 && <View style={styles.notifBadge} />}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addButton} onPress={handleOpenScan}>
+              <MaterialCommunityIcons name="qrcode-scan" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Scan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+              <Feather name="plus" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
@@ -325,6 +425,91 @@ const SellerHomeScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Transit Mark/Scan Modal */}
+      <Modal animationType="slide" transparent={true} visible={showScanModal} onRequestClose={() => setShowScanModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+             <View style={styles.modalHeader}>
+               <Text style={styles.modalTitle}>Mark Produce In Transit</Text>
+               <TouchableOpacity onPress={() => setShowScanModal(false)}>
+                 <Feather name="x" size={24} color={COLORS.textSec} />
+               </TouchableOpacity>
+             </View>
+             
+             <Text style={styles.inputLabel}>Enter Order ID Manually</Text>
+             <TextInput style={styles.input} placeholder="e.g. A3B8X" value={manualOrderID} onChangeText={setManualOrderID} autoCapitalize="none" />
+             <TouchableOpacity style={styles.submitBtn} onPress={handleManualTransit} disabled={loading}>
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Update to In Transit</Text>}
+             </TouchableOpacity>
+
+             <View style={{ marginVertical: 20, alignItems: 'center' }}><Text style={{ color: COLORS.textSec }}>- OR -</Text></View>
+
+             <TouchableOpacity style={[styles.submitBtn, {backgroundColor: '#1E293B'}]} onPress={handleScanQR} disabled={loading}>
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Scan QR from Gallery</Text>}
+             </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Notifications Modal */}
+      <Modal animationType="slide" transparent={true} visible={showNotifModal} onRequestClose={() => setShowNotifModal(false)}>
+          <View style={styles.modalOverlay}>
+             <View style={[styles.modalContent, {height: '70%'}]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Notifications</Text>
+                  <TouchableOpacity onPress={() => setShowNotifModal(false)}>
+                    <Feather name="x" size={24} color={COLORS.textSec} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                   data={notifications}
+                   keyExtractor={(item) => item._id || Math.random().toString()}
+                   renderItem={({item}) => (
+                       <View style={styles.notifCard}>
+                          <Text style={styles.notifMsg}>{item.message}</Text>
+                          {item.type === 'BuyRequest' && <Text style={styles.notifPhone}>Buyer Info: {item.buyerName} | {item.buyerPhone}</Text>}
+                          
+                          <View style={{marginTop: 10}}>
+                             {item.type === 'BuyRequest' && item.status === 'Pending' ? (
+                                <View style={{flexDirection: 'row', gap: 10}}>
+                                   <TouchableOpacity style={[styles.actionBtn, {backgroundColor: COLORS.success, flex: 1, alignItems: 'center'}]} onPress={() => handleNotifResponse(item, 'Accepted')}>
+                                      <Text style={{color: '#fff', fontWeight: 'bold'}}>Accept</Text>
+                                   </TouchableOpacity>
+                                   <TouchableOpacity style={[styles.actionBtn, {backgroundColor: COLORS.danger, flex: 1, alignItems: 'center'}]} onPress={() => handleNotifResponse(item, 'Rejected')}>
+                                      <Text style={{color: '#fff', fontWeight: 'bold'}}>Reject</Text>
+                                   </TouchableOpacity>
+                                </View>
+                             ) : (
+                                <Text style={{fontWeight: 'bold', color: item.status === 'Accepted' ? COLORS.success : COLORS.textSec}}>
+                                   Status: {item.status || 'Resolved'}
+                                </Text>
+                             )}
+                          </View>
+                       </View>
+                   )}
+                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20}}>No new notifications.</Text>}
+                />
+             </View>
+          </View>
+      </Modal>
+
+      {/* QR Display Modal */}
+      <Modal animationType="fade" transparent={true} visible={showQRModal} onRequestClose={() => setShowQRModal(false)}>
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrContent}>
+             <Text style={styles.modalTitle}>Produce QR Code</Text>
+             <Text style={{ textAlign: 'center', marginBottom: 20, color: COLORS.textSec }}>Screenshot and save this QR. Use the Scanner later to mark this produce as 'In Transit'.</Text>
+             {createdQRData ? (
+                 <QRCode value={createdQRData} size={200} />
+             ) : null}
+             <TouchableOpacity style={[styles.submitBtn, {marginTop: 30, width: '100%'}]} onPress={() => setShowQRModal(false)}>
+                <Text style={styles.submitBtnText}>Done</Text>
+             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -375,6 +560,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   submitBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  qrOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  qrContent: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 30, width: '85%', alignItems: 'center', elevation: 10 },
+  notifBadge: { position: 'absolute', top: 5, right: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.danger },
+  notifCard: { backgroundColor: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 10 },
+  notifMsg: { fontSize: 15, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
+  notifPhone: { fontSize: 13, color: COLORS.textSec }
 });
 
 export default SellerHomeScreen;

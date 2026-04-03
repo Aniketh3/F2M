@@ -80,7 +80,7 @@ const ProfileScreen = ({ navigation }) => {
 
       // 2. Call API
       // REPLACE WITH YOUR COMPUTER'S IP ADDRESS
-      const response = await axios.get('http://10.140.10.251:3000/profile', {
+      const response = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 

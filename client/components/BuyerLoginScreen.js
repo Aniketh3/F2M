@@ -20,7 +20,7 @@ import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 
 // 🔧 CONFIGURATION: Check your IP!
-const BACKEND_URL = 'http://10.140.10.251:3000'; // Replace with your laptop IP
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
 const COLORS = {
   primary: '#F59E0B',    

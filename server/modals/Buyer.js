@@ -33,6 +33,16 @@ const orders = new mongoose.Schema({
     }
 })
 
+const buyerNotificationSchema = new mongoose.Schema({
+    type: { type: String, default: "OrderUpdate" }, 
+    message: { type: String },
+    sellerName: { type: String },
+    orderID: { type: String },
+    itemName: { type: String },
+    status: { type: String }, // 'Accepted', 'Rejected'
+    date: { type: Date, default: Date.now }
+});
+
 const buyerSchema = new mongoose.Schema({
 Name:{
     type:String,
@@ -65,6 +75,10 @@ Address:{
 },
 MyOrders:{
     type:[orders],
+    default:[]
+},
+Notifications:{
+    type:[buyerNotificationSchema],
     default:[]
 }
 })

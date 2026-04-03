@@ -122,7 +122,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
         GSTNumber: gst,
       };
 
-      await axios.post('http://10.140.10.251:3000/buyer/register', payload);
+      await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/buyer/register`, payload);
       
       Alert.alert('Application Approved', 'Welcome to the network.', [
         { text: 'Login Now', onPress: () => navigation.replace('BuyerLogin') }

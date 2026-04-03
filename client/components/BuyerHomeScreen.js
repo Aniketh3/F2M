@@ -42,9 +42,15 @@ const BuyerHomeScreen = () => {
   const [groupedItems, setGroupedItems] = useState([]);
   const [search, setSearch] = useState('');
   
-  // UI State
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Custom states added for Notifs
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifModal, setShowNotifModal] = useState(false);
+
+  // Buyer Info
+  const [buyerName, setBuyerName] = useState('');
   
   // Modal State (Drill Down)
   const [selectedProduce, setSelectedProduce] = useState(null); // The item clicked (e.g. 'Tomato')
@@ -52,16 +58,22 @@ const BuyerHomeScreen = () => {
   const [aiPrediction, setAiPrediction] = useState(null);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
 
-  const backend = 'http://10.140.10.251:3000';
+  const backend = process.env.EXPO_PUBLIC_API_URL;
 
-  // 🔄 FETCH MARKET DATA
-  const fetchMarket = async () => {
+  const fetchMarket = async (bName = buyerName) => {
     setLoading(true);
     try {
       const res = await axios.get(`${backend}/market-view`);
       const rawData = res.data || [];
       setMarket(rawData);
       groupDataByProduce(rawData);
+      
+      if (bName) {
+         try {
+            const res2 = await axios.get(`${backend}/buyerNotifications?username=${bName}`);
+            setNotifications((res2.data.notifications || []).reverse());
+         } catch(e) {}
+      }
     } catch (e) {
       console.log(e);
       Alert.alert('Connection Error', 'Could not load the market.');
@@ -72,7 +84,15 @@ const BuyerHomeScreen = () => {
   };
 
   useEffect(() => {
-    fetchMarket();
+    AsyncStorage.getItem('buyerInfo').then(data => {
+        if (data) {
+           const parsed = JSON.parse(data);
+           setBuyerName(parsed.Name);
+           fetchMarket(parsed.Name);
+        } else {
+           fetchMarket();
+        }
+    });
   }, []);
 
   // 🧱 LOGIC: GROUP BY PRODUCE
@@ -156,6 +176,22 @@ const BuyerHomeScreen = () => {
     fetchPrediction(item.name);
   };
 
+  // 🛒 HANDLE BUY
+  const handleBuy = async (item) => {
+      try {
+          await axios.post(`${backend}/buyProduce`, {
+              sellerName: item.sellerName,
+              buyerName: buyerName,
+              buyerPhone: "Registered Phone", 
+              orderID: item.OrderID,
+              itemName: item.SellItem
+          });
+          Alert.alert("Success", `Request sent to ${item.sellerName}! They have been notified.`);
+      } catch (err) {
+          Alert.alert("Error", "Could not send buy request.");
+      }
+  };
+
   // 🎨 HELPER: Get Icon based on name
   const getProduceIcon = (name) => {
     const n = name.toLowerCase();
@@ -219,24 +255,67 @@ const BuyerHomeScreen = () => {
       
       <View style={styles.priceAction}>
         <Text style={styles.sellerPrice}>₹{item.SaleAmount/item.SellQuantity}<Text style={{fontSize:12, fontWeight:'400'}}>/kg</Text></Text>
-        <TouchableOpacity style={styles.buyBtn}>
+        <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuy(item)}>
           <Text style={styles.buyBtnText}>Buy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+           style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center' }} 
+           onPress={() => Alert.alert("Transit Status", `The current status of this produce is: ${item.TransactionStatus || 'Pending'}`)}>
+           <MaterialCommunityIcons name="information-outline" size={16} color={COLORS.primary} />
+           <Text style={{ fontSize: 12, color: COLORS.primary, marginLeft: 4 }}>Track Status</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  // -------------------------
+  // RENDER MAIN SCREEN
+  // -------------------------
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
+      
+      {/* Notifications Modal */}
+      <Modal animationType="slide" transparent={true} visible={showNotifModal} onRequestClose={() => setShowNotifModal(false)}>
+          <View style={styles.modalOverlay}>
+             <View style={[styles.modalContent, {height: '70%', backgroundColor: '#F8FAFC'}]}>
+                <View style={[styles.modalHeader, {marginBottom: 10}]}>
+                  <Text style={styles.modalTitle}>Notifications</Text>
+                  <TouchableOpacity onPress={() => setShowNotifModal(false)} style={styles.closeBtn}>
+                    <Feather name="x" size={24} color={COLORS.textMain} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                   data={notifications}
+                   keyExtractor={(item) => item._id || Math.random().toString()}
+                   showsVerticalScrollIndicator={false}
+                   renderItem={({item}) => (
+                       <View style={styles.notifCard}>
+                          <Text style={styles.notifMsg}>{item.message}</Text>
+                          <Text style={styles.notifPhone}>Status: <Text style={{fontWeight: 'bold', color: item.status === 'Accepted' ? COLORS.success : (item.status === 'Rejected' ? COLORS.error : COLORS.textMain)}}>{item.status}</Text></Text>
+                       </View>
+                   )}
+                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20, color: COLORS.textSec }}>No new notifications.</Text>}
+                />
+             </View>
+          </View>
+      </Modal>
       
       {/* 1. HEADER */}
       <LinearGradient
         colors={[COLORS.primary, COLORS.primaryDark]}
         style={styles.header}
       >
-        <Text style={styles.welcomeText}>Fresh Market</Text>
-        <Text style={styles.subWelcome}>Source directly from farms</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View>
+             <Text style={styles.welcomeText}>Fresh Market</Text>
+             <Text style={styles.subWelcome}>Source directly from farms</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowNotifModal(true)} style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20}}>
+             <MaterialCommunityIcons name="bell" size={24} color="#FFF" />
+             {notifications.length > 0 && <View style={styles.notifBadge} />}
+          </TouchableOpacity>
+        </View>
         
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -640,6 +719,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
+  notifBadge: { position: 'absolute', top: 5, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.error, borderWidth: 2, borderColor: COLORS.primary },
+  notifCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
+  notifMsg: { fontSize: 16, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
+  notifPhone: { fontSize: 13, color: COLORS.textSec }
 });
 
 export default BuyerHomeScreen;

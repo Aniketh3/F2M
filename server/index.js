@@ -113,9 +113,9 @@ app.get("/sellerSaleList", async(req,res)=>{
     try {
         const seller = await Seller.findOne({Name:username});
         if(seller){
-            res.status(200).json({seller:seller.MySellList});
+            res.status(200).json({seller:seller.MySellList, notifications: seller.Notifications});
         } else {
-            res.status(403).json({seller:[]});
+            res.status(403).json({seller:[], notifications: []});
         }
     } catch(err){ res.status(500).send("Error"); }
 });
@@ -125,14 +125,15 @@ app.post("/sellerSale", async(req,res)=>{
     const username = req.query.username;
     const {SellItem,SellQuantity,SaleAmount} = req.body;
     try {
+        const orderID = generateOrderId();
         const selllist = {
-            OrderID: generateOrderId(),
+            OrderID: orderID,
             isTransactionComplete: false,
             TransactionStatus: "Pending",
             SellItem, SellQuantity, SaleAmount
         };
         await Seller.findOneAndUpdate({Name: username}, {$push:{MySellList: selllist}}, {new:true});
-        res.status(200).json({message:"Sale List Updated Successfully"});
+        res.status(200).json({message:"Sale List Updated Successfully", orderID});
     } catch(err){ res.status(500).json({message:"Error"}); }
 });
 
@@ -265,6 +266,102 @@ app.post("/buyer/register", async (req, res) => {
     if (await Buyer.findOne({ Name, AadharNumber })) return res.status(500).json({ message: "User exists" });
     await new Buyer(req.body).save();
     res.status(200).json({ message: "Registered" });
+});
+
+app.post("/sellerSale/transitStatus", async (req, res) => {
+    const { orderID, sellerName, status } = req.body;
+    try {
+        const result = await Seller.findOneAndUpdate(
+            { Name: sellerName, "MySellList.OrderID": orderID },
+            { $set: { "MySellList.$.TransactionStatus": status } },
+            { new: true }
+        );
+        if (result) res.status(200).json({ message: "Status updated" });
+        else res.status(404).json({ message: "Not found" });
+    } catch (err) { res.status(500).json({ message: "Error" }); }
+});
+
+const { Jimp } = require("jimp");
+const jsQR = require("jsqr");
+
+app.post("/decode-qr", async (req, res) => {
+    const { imageBase64 } = req.body;
+    if (!imageBase64) return res.status(400).json({ message: "No image provided" });
+    try {
+        const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+        
+        const image = await Jimp.read(buffer);
+        const qrCode = jsQR(new Uint8ClampedArray(image.bitmap.data), image.bitmap.width, image.bitmap.height);
+        
+        if (qrCode && qrCode.data) {
+            res.status(200).json({ data: qrCode.data });
+        } else {
+            res.status(400).json({ message: "No QR code found in image" });
+        }
+    } catch (e) {
+        console.log("Decode error:", e);
+        res.status(500).json({ message: "Error decoding QR. Please ensure it is a clear image.", error: String(e) });
+    }
+});
+
+app.post("/buyProduce", async (req, res) => {
+    const { sellerName, buyerName, buyerPhone, orderID, itemName } = req.body;
+    try {
+        const notif = {
+            type: "BuyRequest",
+            message: `${buyerName} wants to buy your ${itemName}!`,
+            buyerName,
+            buyerPhone,
+            orderID,
+            itemName,
+            status: "Pending"
+        };
+        await Seller.findOneAndUpdate({ Name: sellerName }, { $push: { Notifications: notif } }, { new: true });
+        res.status(200).json({ message: "Notification sent to Seller" });
+    } catch(err) {
+        res.status(500).json({ message: "Error notifying seller" });
+    }
+});
+
+app.post("/respondBuyRequest", async (req, res) => {
+    const { sellerName, buyerName, orderID, itemName, status } = req.body; // status is "Accepted" or "Rejected"
+    try {
+        // 1. Update Seller's notification status
+        await Seller.updateOne(
+            { Name: sellerName, "Notifications.orderID": orderID, "Notifications.buyerName": buyerName },
+            { $set: { "Notifications.$.status": status } }
+        );
+        
+        // 2. Add Notification to Buyer
+        const buyerNotif = {
+            type: "OrderUpdate",
+            message: `${sellerName} has ${status} your request to buy ${itemName}.`,
+            sellerName,
+            orderID,
+            itemName,
+            status
+        };
+        await Buyer.findOneAndUpdate({ Name: buyerName }, { $push: { Notifications: buyerNotif } });
+        
+        res.status(200).json({ message: "Response sent to Buyer" });
+    } catch(err) {
+        res.status(500).json({ message: "Error responding to request" });
+    }
+});
+
+app.get("/buyerNotifications", async (req, res) => {
+    const { username } = req.query;
+    try {
+        const buyer = await Buyer.findOne({ Name: username });
+        if (buyer) {
+            res.status(200).json({ notifications: buyer.Notifications });
+        } else {
+            res.status(404).json({ notifications: [] });
+        }
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching notifications" });
+    }
 });
 
 app.use('/escrow', escrowRoutes);
