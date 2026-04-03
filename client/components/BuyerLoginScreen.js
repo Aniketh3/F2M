@@ -16,6 +16,7 @@ import {
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +35,7 @@ const COLORS = {
 };
 
 const BuyerLoginScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
@@ -111,8 +113,8 @@ const BuyerLoginScreen = ({ navigation }) => {
             <View style={styles.iconCircle}>
               <MaterialCommunityIcons name="basket" size={32} color={COLORS.primary} />
             </View>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Log in to access fresh produce.</Text>
+            <Text style={styles.title}>{t('login')}</Text>
+            <Text style={styles.subtitle}>{t('source_direct')}</Text>
           </View>
 
           {/* FORM */}
@@ -167,7 +169,7 @@ const BuyerLoginScreen = ({ navigation }) => {
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
-                  <Text style={styles.loginButtonText}>Sign In</Text>
+                  <Text style={styles.loginButtonText}>{t('login')}</Text>
                   <Feather name="arrow-right" size={20} color="#FFF" />
                 </>
               )}
@@ -177,9 +179,9 @@ const BuyerLoginScreen = ({ navigation }) => {
 
           {/* FOOTER */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Text style={styles.footerText}>{t('dont_have_account')} </Text>
             <TouchableOpacity onPress={() => navigation.navigate('BuyerRegister')}>
-              <Text style={styles.linkText}>Register</Text>
+              <Text style={styles.linkText}>{t('register')}</Text>
             </TouchableOpacity>
           </View>
 

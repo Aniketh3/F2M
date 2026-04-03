@@ -17,6 +17,7 @@ import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +69,7 @@ const ModernInput = ({ label, value, onChange, placeholder, icon, keyboard = 'de
 );
 
 const BuyerRegisterScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
   
@@ -146,7 +148,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Feather name="arrow-left" size={24} color={COLORS.textMain} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Create Profile</Text>
+        <Text style={styles.navTitle}>{t('register')}</Text>
         <View style={{ width: 42 }} /> 
       </View>
 
@@ -158,17 +160,17 @@ const BuyerRegisterScreen = ({ navigation }) => {
         >
           
           <View style={styles.heroSection}>
-            <Text style={styles.heroTitle}>Unlock Freshness.</Text>
+            <Text style={styles.heroTitle}>{t('register')}</Text>
             <Text style={styles.heroSubtitle}>
-              Join the premium network of buyers and source directly from the harvest.
+              {t('source_direct')}
             </Text>
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Business Identity" icon="briefcase" />
+            <SectionHeader title={t('business_identity')} icon="briefcase" />
             <ModernInput 
-              label="Full Name / Business Name" 
-              placeholder="Name or Organization" 
+              label={t('farm_name')} 
+              placeholder={t('username')} 
               icon="user" 
               value={formData.name} 
               onChange={(t) => updateField('name', t)} 
@@ -182,7 +184,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
               keyboard="email-address"
             />
             <ModernInput 
-              label="Phone Number" 
+              label={t('mobile_number')} 
               placeholder="10-digit mobile" 
               icon="smartphone" 
               value={formData.phone} 
@@ -192,12 +194,12 @@ const BuyerRegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Compliance & Security" icon="shield" />
+            <SectionHeader title={t('compliance_security')} icon="shield" />
             
             <View style={styles.row}>
                <View style={styles.col}>
                   <ModernInput 
-                    label="Aadhar Number" 
+                    label={t('aadhar_number')} 
                     placeholder="12 Digits" 
                     icon="credit-card" 
                     value={formData.aadhar} 
@@ -218,7 +220,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
             </View>
 
             <ModernInput 
-              label="Set Access PIN" 
+              label={t('password')} 
               placeholder="6 Digits" 
               icon="lock" 
               value={formData.pin} 
@@ -230,7 +232,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Delivery Point" icon="map-pin" />
+            <SectionHeader title={t('delivery_point')} icon="map-pin" />
             <View style={styles.mapContainer}>
               {initialRegion ? (
                 <MapView
@@ -243,11 +245,11 @@ const BuyerRegisterScreen = ({ navigation }) => {
               ) : (
                 <View style={styles.mapPlaceholder}>
                   <ActivityIndicator color={COLORS.primary} />
-                  <Text style={styles.mapLoadingText}>Acquiring location...</Text>
+                  <Text style={styles.mapLoadingText}>{t('detecting_location')}</Text>
                 </View>
               )}
               <View style={styles.mapBadge}>
-                <Text style={styles.mapBadgeText}>Tap to pinpoint location</Text>
+                <Text style={styles.mapBadgeText}>{t('tap_map')}</Text>
               </View>
             </View>
           </View>
@@ -270,7 +272,7 @@ const BuyerRegisterScreen = ({ navigation }) => {
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.loginLink} onPress={() => navigation.navigate('BuyerLogin')}>
-               <Text style={styles.loginLinkText}>Already a member? <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Log In</Text></Text>
+               <Text style={styles.loginLinkText}>{t('already_have_account')} <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{t('login')}</Text></Text>
             </TouchableOpacity>
           </View>
 

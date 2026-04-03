@@ -1,23 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  StatusBar,
-  Switch,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
-import axios from 'axios';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Switch, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
 // 🎨 DYNAMIC THEME ENGINE
 const THEMES = {
@@ -43,6 +32,7 @@ const COLORS = {
 };
 
 const ProfileScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState('seller');
   const [userData, setUserData] = useState(null);
@@ -130,10 +120,10 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t('logout'), t('logging_out'), [
+      { text: t('back'), style: "cancel" },
       {
-        text: "Logout", style: "destructive", onPress: async () => {
+        text: t('logout'), style: "destructive", onPress: async () => {
           await AsyncStorage.clear();
           const loginScreen = role === 'seller' ? 'SellerLogin' : 'BuyerLogin';
           navigation.reset({
@@ -207,7 +197,7 @@ const ProfileScreen = ({ navigation }) => {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={{ marginTop: 15, color: COLORS.textSec }}>Syncing Profile...</Text>
+        <Text style={{ marginTop: 15, color: COLORS.textSec }}>{t('loading')}</Text>
       </View>
     );
   }
@@ -227,7 +217,7 @@ const ProfileScreen = ({ navigation }) => {
             style={styles.gradientHeader}
           >
             <View style={styles.headerTopBar}>
-              <Text style={styles.headerTitle}>My Profile</Text>
+              <Text style={styles.headerTitle}>{t('profile')}</Text>
               <TouchableOpacity style={styles.settingsBtn}>
                 <Feather name="settings" size={20} color="#fff" />
               </TouchableOpacity>
@@ -261,9 +251,9 @@ const ProfileScreen = ({ navigation }) => {
               </View>
             </TouchableOpacity>
 
-            <Text style={styles.userName}>{userData?.name}</Text>
+            <TranslatedText text={userData?.name} style={styles.userName} />
             <Text style={styles.userRole}>
-              {role === 'seller' ? 'Verified Farmer' : 'Registered Buyer'} • {userData?.location || 'India'}
+              {role === 'seller' ? t('sellers') : t('market')} • {userData?.location || 'India'}
             </Text>
 
             {/* STATUS TOGGLE */}
@@ -271,7 +261,7 @@ const ProfileScreen = ({ navigation }) => {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={[styles.dot, { backgroundColor: isOnline ? '#10B981' : '#94A3B8' }]} />
                 <Text style={styles.statusText}>
-                  {isOnline ? (role === 'seller' ? 'Taking Orders' : 'Active') : 'Away'}
+                  {isOnline ? (role === 'seller' ? t('active') : t('active')) : t('pending')}
                 </Text>
               </View>
               <Switch
@@ -291,9 +281,9 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.completionCard}>
             <View style={styles.completionHeader}>
               <View>
-                <Text style={styles.completionTitle}>Profile Health</Text>
+                <Text style={styles.completionTitle}>{t('profile_settings')}</Text>
                 <Text style={styles.completionSub}>
-                  {completion === 100 ? 'Excellent! Profile complete.' : 'Complete your data to win trust.'}
+                  {completion === 100 ? t('success') : t('personal_info')}
                 </Text>
               </View>
               <Text style={[styles.completionPercent, { color: theme.primary }]}>{completion}%</Text>
@@ -310,7 +300,7 @@ const ProfileScreen = ({ navigation }) => {
 
             {completion < 100 && (
               <TouchableOpacity style={styles.completeNowBtn}>
-                <Text style={[styles.completeNowText, { color: theme.primary }]}>Complete Now</Text>
+                <Text style={[styles.completeNowText, { color: theme.primary }]}>{t('continue')}</Text>
                 <Feather name="arrow-right" size={14} color={theme.primary} />
               </TouchableOpacity>
             )}
@@ -320,7 +310,7 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statValue}>{userData?.orders}</Text>
-              <Text style={styles.statLabel}>Total Orders</Text>
+              <Text style={styles.statLabel}>{t('orders')}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -335,11 +325,11 @@ const ProfileScreen = ({ navigation }) => {
 
           {/* 4. MENU SECTIONS */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionHeader}>Personal Information</Text>
+            <Text style={styles.sectionHeader}>{t('personal_info')}</Text>
             <View style={styles.menuGroup}>
-              <MenuItem icon="smartphone" title="Phone" subtitle={userData?.phone || 'Add Phone'} color={theme.primary} />
-              <MenuItem icon="mail" title="Email" subtitle={userData?.email || 'Add Email'} color={theme.primary} />
-              <MenuItem icon="credit-card" title="Aadhar / KYC" subtitle={userData?.aadhar ? 'Verified' : 'Pending'} color={theme.primary} isLast />
+              <MenuItem icon="smartphone" title={t('phone_number')} subtitle={userData?.phone || t('add')} color={theme.primary} />
+              <MenuItem icon="mail" title="Email" subtitle={userData?.email || t('add')} color={theme.primary} />
+              <MenuItem icon="credit-card" title="Aadhar / KYC" subtitle={userData?.aadhar ? t('success') : t('pending')} color={theme.primary} isLast />
             </View>
           </View>
 
@@ -355,7 +345,7 @@ const ProfileScreen = ({ navigation }) => {
           {/* LOGOUT */}
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Feather name="log-out" size={18} color={COLORS.danger} />
-            <Text style={styles.logoutText}>Sign Out</Text>
+            <Text style={styles.logoutText}>{t('logout')}</Text>
           </TouchableOpacity>
 
           <Text style={styles.versionText}>Farm2Market v1.0 • Secure</Text>

@@ -23,6 +23,7 @@ import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
+import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
 // 🔧 CONFIG
 const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -40,7 +41,8 @@ const COLORS = {
   edit: '#3B82F6' // Blue for edit
 };
 
-const SellerHomeScreen = () => {
+const SellerHomeScreen = ({ navigation }) => {
+  const { t, language, changeLanguage } = useLanguage();
   const [mySales, setMySales] = useState([]);
   const [sellerName, setSellerName] = useState('');
   
@@ -278,7 +280,7 @@ const SellerHomeScreen = () => {
             <MaterialCommunityIcons name="corn" size={24} color={COLORS.primary} />
           </View>
           <View>
-            <Text style={styles.cardTitle}>{item.SellItem}</Text>
+            <TranslatedText style={styles.cardTitle} text={item.SellItem} />
             <Text style={styles.cardId}>#{item.OrderID?.substring(0, 6)}</Text>
           </View>
         </View>
@@ -298,19 +300,19 @@ const SellerHomeScreen = () => {
 
       <View style={styles.cardBody}>
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Qty</Text>
+          <Text style={styles.statLabel}>{t('qty')}</Text>
           <Text style={styles.statValue}>{item.SellQuantity} kg</Text>
         </View>
         <View style={styles.verticalDivider} />
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Price</Text>
+          <Text style={styles.statLabel}>{t('price')}</Text>
           <Text style={styles.statValue}>₹{item.SaleAmount}</Text>
         </View>
         <View style={styles.verticalDivider} />
         <View style={styles.stat}>
-          <Text style={styles.statLabel}>Status</Text>
+          <Text style={styles.statLabel}>{t('status')}</Text>
           <Text style={[styles.statValue, { color: item.isTransactionComplete ? COLORS.success : (item.TransactionStatus === 'In Transit' ? COLORS.primary : '#F59E0B') }]}>
-            {item.isTransactionComplete ? 'Sold' : (item.TransactionStatus || 'Pending')}
+            {item.isTransactionComplete ? t('sold') : (item.TransactionStatus || t('pending'))}
           </Text>
         </View>
       </View>
@@ -325,40 +327,43 @@ const SellerHomeScreen = () => {
       <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.greeting}>{t('welcome_back')}</Text>
             <Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('SellerChat')}>
+              <MaterialCommunityIcons name="message-text-outline" size={20} color="#fff" />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.addButton} onPress={() => setShowNotifModal(true)}>
               <MaterialCommunityIcons name="bell" size={20} color="#fff" />
               {notifications.length > 0 && <View style={styles.notifBadge} />}
             </TouchableOpacity>
             <TouchableOpacity style={styles.addButton} onPress={handleOpenScan}>
               <MaterialCommunityIcons name="qrcode-scan" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Scan</Text>
+              <Text style={styles.addButtonText}>{t('scan')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
               <Feather name="plus" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={styles.addButtonText}>{t('add')}</Text>
             </TouchableOpacity>
           </View>
         </View>
         <View style={styles.summaryContainer}>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryValue}>{mySales.length}</Text>
-            <Text style={styles.summaryLabel}>Total Items</Text>
+            <Text style={styles.summaryLabel}>{t('total_items')}</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryBox}>
             <Text style={styles.summaryValue}>{mySales.filter(i => !i.isTransactionComplete).length}</Text>
-            <Text style={styles.summaryLabel}>Active</Text>
+            <Text style={styles.summaryLabel}>{t('active')}</Text>
           </View>
         </View>
       </LinearGradient>
 
       {/* LIST */}
       <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>My Inventory</Text>
+        <Text style={styles.sectionTitle}>{t('my_inventory')}</Text>
         <FlatList
           data={mySales}
           renderItem={renderSaleItem}
@@ -381,7 +386,7 @@ const SellerHomeScreen = () => {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{isEditing ? 'Edit Listing' : 'New Listing'}</Text>
+              <Text style={styles.modalTitle}>{isEditing ? t('edit_listing') : t('new_listing')}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Feather name="x" size={24} color={COLORS.textSec} />
               </TouchableOpacity>
@@ -390,36 +395,36 @@ const SellerHomeScreen = () => {
             <ScrollView contentContainerStyle={styles.formScroll}>
               {!isEditing && (
                 <>
-                  <Text style={styles.inputLabel}>Verification Photo</Text>
+                  <Text style={styles.inputLabel}>{t('compliance_security')}</Text>
                   <TouchableOpacity style={styles.cameraBox} onPress={openCamera}>
                     {image ? (
                       <Image source={{ uri: image }} style={styles.imagePreview} />
                     ) : (
                       <View style={{ alignItems: 'center' }}>
                         <Feather name="camera" size={32} color={COLORS.primary} />
-                        <Text style={styles.cameraText}>Tap to capture</Text>
+                        <Text style={styles.cameraText}>{t('add')}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
                 </>
               )}
 
-              <Text style={styles.inputLabel}>Crop Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Potatoes" value={sellItem} onChangeText={setSellItem} />
+              <Text style={styles.inputLabel}>{t('crop_name')}</Text>
+              <TextInput style={styles.input} placeholder={t('price')} value={sellItem} onChangeText={setSellItem} />
 
               <View style={styles.row}>
                 <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={styles.inputLabel}>Quantity (kg)</Text>
+                  <Text style={styles.inputLabel}>{t('qty')} (kg)</Text>
                   <TextInput style={styles.input} placeholder="0" value={sellQuantity} onChangeText={setSellQuantity} keyboardType="numeric" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>Price (₹)</Text>
+                  <Text style={styles.inputLabel}>{t('price')} (₹)</Text>
                   <TextInput style={styles.input} placeholder="0" value={saleAmount} onChangeText={setSaleAmount} keyboardType="numeric" />
                 </View>
               </View>
 
               <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isEditing ? 'Update Listing' : 'Post Listing'}</Text>}
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isEditing ? t('update_listing') : t('post_listing')}</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -431,16 +436,16 @@ const SellerHomeScreen = () => {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
              <View style={styles.modalHeader}>
-               <Text style={styles.modalTitle}>Mark Produce In Transit</Text>
+               <Text style={styles.modalTitle}>{t('in_transit')}</Text>
                <TouchableOpacity onPress={() => setShowScanModal(false)}>
                  <Feather name="x" size={24} color={COLORS.textSec} />
                </TouchableOpacity>
              </View>
              
-             <Text style={styles.inputLabel}>Enter Order ID Manually</Text>
+             <Text style={styles.inputLabel}>{t('track_status')}</Text>
              <TextInput style={styles.input} placeholder="e.g. A3B8X" value={manualOrderID} onChangeText={setManualOrderID} autoCapitalize="none" />
              <TouchableOpacity style={styles.submitBtn} onPress={handleManualTransit} disabled={loading}>
-                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Update to In Transit</Text>}
+                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{t('update_listing')}</Text>}
              </TouchableOpacity>
 
              <View style={{ marginVertical: 20, alignItems: 'center' }}><Text style={{ color: COLORS.textSec }}>- OR -</Text></View>
@@ -457,7 +462,7 @@ const SellerHomeScreen = () => {
           <View style={styles.modalOverlay}>
              <View style={[styles.modalContent, {height: '70%'}]}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Notifications</Text>
+                  <Text style={styles.modalTitle}>{t('chat')}</Text>
                   <TouchableOpacity onPress={() => setShowNotifModal(false)}>
                     <Feather name="x" size={24} color={COLORS.textSec} />
                   </TouchableOpacity>
@@ -488,7 +493,7 @@ const SellerHomeScreen = () => {
                           </View>
                        </View>
                    )}
-                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20}}>No new notifications.</Text>}
+                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20}}>{t('no_orders')}</Text>}
                 />
              </View>
           </View>

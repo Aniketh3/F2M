@@ -17,6 +17,7 @@ import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import axios from 'axios';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -68,6 +69,7 @@ const ModernInput = ({ label, value, onChange, placeholder, icon, keyboard = 'de
 );
 
 const SellerRegisterScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [showPin, setShowPin] = useState(false);
 
@@ -153,7 +155,7 @@ const SellerRegisterScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Feather name="arrow-left" size={24} color={COLORS.textMain} />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>New Partner</Text>
+        <Text style={styles.navTitle}>{t('register')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -165,23 +167,23 @@ const SellerRegisterScreen = ({ navigation }) => {
         >
           
           <View style={styles.heroSection}>
-            <Text style={styles.heroTitle}>Cultivate Success.</Text>
+            <Text style={styles.heroTitle}>{t('register')}</Text>
             <Text style={styles.heroSubtitle}>
-              Register your farm to access fair prices and direct buyers.
+              {t('source_direct')}
             </Text>
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Farm Identity" icon="sun" />
+            <SectionHeader title={t('farm_identity')} icon="sun" />
             <ModernInput 
-              label="Farmer / Business Name" 
-              placeholder="Name or Organization" 
+              label={t('farm_name')} 
+              placeholder={t('username')} 
               icon="user" 
               value={formData.name} 
               onChange={(t) => updateField('name', t)} 
             />
             <ModernInput 
-              label="Mobile Number" 
+              label={t('mobile_number')} 
               placeholder="10-digit number" 
               icon="smartphone" 
               value={formData.phone} 
@@ -189,7 +191,7 @@ const SellerRegisterScreen = ({ navigation }) => {
               keyboard="phone-pad"
             />
             <ModernInput 
-              label="Fruits ID / License" 
+              label={t('fruits_id')} 
               placeholder="Official ID" 
               icon="tag" 
               value={formData.fruitsId} 
@@ -198,9 +200,9 @@ const SellerRegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Legal & Security" icon="shield" />
+            <SectionHeader title={t('legal_security')} icon="shield" />
             <ModernInput 
-              label="Aadhar Number" 
+              label={t('aadhar_number')} 
               placeholder="12-digit UID" 
               icon="credit-card" 
               value={formData.aadhar} 
@@ -208,7 +210,7 @@ const SellerRegisterScreen = ({ navigation }) => {
               keyboard="numeric"
             />
             <ModernInput 
-              label="Create Access PIN" 
+              label={t('password')} 
               placeholder="6-digit PIN" 
               icon="lock" 
               value={formData.pin} 
@@ -220,7 +222,7 @@ const SellerRegisterScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.card}>
-            <SectionHeader title="Farm Location" icon="map-pin" />
+            <SectionHeader title={t('farm_location')} icon="map-pin" />
             <View style={styles.mapContainer}>
               {initialRegion ? (
                 <MapView
@@ -233,11 +235,11 @@ const SellerRegisterScreen = ({ navigation }) => {
               ) : (
                 <View style={styles.mapPlaceholder}>
                   <ActivityIndicator color={COLORS.primary} />
-                  <Text style={styles.mapLoadingText}>Detecting location...</Text>
+                  <Text style={styles.mapLoadingText}>{t('detecting_location')}</Text>
                 </View>
               )}
               <View style={styles.mapBadge}>
-                <Text style={styles.mapBadgeText}>Tap map to set farm location</Text>
+                <Text style={styles.mapBadgeText}>{t('tap_map')}</Text>
               </View>
             </View>
           </View>
@@ -253,14 +255,14 @@ const SellerRegisterScreen = ({ navigation }) => {
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
-                  <Text style={styles.submitBtnText}>Register Farm</Text>
+                  <Text style={styles.submitBtnText}>{t('register')}</Text>
                   <Feather name="arrow-right" size={20} color="#FFF" />
                 </>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.loginLink} onPress={() => navigation.navigate('SellerLogin')}>
-               <Text style={styles.loginLinkText}>Already registered? <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Log In</Text></Text>
+               <Text style={styles.loginLinkText}>{t('already_have_account')} <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{t('login')}</Text></Text>
             </TouchableOpacity>
           </View>
 

@@ -27,6 +27,8 @@ import BuyerHomeScreen from './components/BuyerHomeScreen';
 import OrdersScreen from './components/OrdersScreen';
 import ProfileScreen from './components/ProfileScreen';
 import BidsScreen from './components/BidsScreen';
+import SellerChatScreen from './components/SellerChatScreen';
+import { LanguageProvider, useLanguage, LanguageContext, TranslatedText } from './context/LanguageContext';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -309,7 +311,28 @@ const TabIcon = ({ name, color, focused, label }) => (
   </View>
 );
 
+const LanguageSwitcherTab = (props) => {
+  const context = React.useContext(LanguageContext);
+  if (!context) return null;
+  const { language, changeLanguage } = context;
+
+  return (
+    <TouchableOpacity 
+      {...props}
+      style={[styles.tabItem, props.style]} 
+      onPress={() => {
+        const next = language === 'en' ? 'kn' : (language === 'kn' ? 'hi' : 'en');
+        changeLanguage(next);
+      }}
+    >
+      <MaterialCommunityIcons name="translate" size={24} color={props.color || "#94A3B8"} />
+      <Text style={[styles.tabLabel, { color: props.color || "#94A3B8", textTransform: 'uppercase' }]}>{language}</Text>
+    </TouchableOpacity>
+  );
+};
+
 function SellerTabs() {
+  const { t } = useLanguage();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -320,15 +343,17 @@ function SellerTabs() {
         tabBarInactiveTintColor: '#94A3B8',
       }}
     >
-      <Tab.Screen name="Home" component={SellerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="home-variant-outline" label="Home" {...p} /> }}/>
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="clipboard-text-outline" label="Orders" {...p} /> }}/>
-      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="gavel" label="Bids" {...p} /> }}/>
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label="Profile" {...p} /> }}/>
+      <Tab.Screen name="Home" component={SellerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="home-variant-outline" label={t('home')} {...p} /> }}/>
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="clipboard-text-outline" label={t('orders')} {...p} /> }}/>
+      <Tab.Screen name="Language" component={View} options={{ tabBarButton: (p) => <LanguageSwitcherTab {...p} color="#94A3B8" /> }} />
+      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="gavel" label={t('bids')} {...p} /> }}/>
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label={t('profile')} {...p} /> }}/>
     </Tab.Navigator>
   );
 }
 
 function BuyerTabs() {
+  const { t } = useLanguage();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -339,10 +364,11 @@ function BuyerTabs() {
         tabBarInactiveTintColor: '#94A3B8',
       }}
     >
-      <Tab.Screen name="Home" component={BuyerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="storefront-outline" label="Market" {...p} /> }}/>
-      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="shopping-outline" label="Orders" {...p} /> }}/>
-      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="ticket-percent-outline" label="Bids" {...p} /> }}/>
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label="Profile" {...p} /> }}/>
+      <Tab.Screen name="Home" component={BuyerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="storefront-outline" label={t('market')} {...p} /> }}/>
+      <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="shopping-outline" label={t('orders')} {...p} /> }}/>
+      <Tab.Screen name="Language" component={View} options={{ tabBarButton: (p) => <LanguageSwitcherTab {...p} color="#94A3B8" /> }} />
+      <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="ticket-percent-outline" label={t('bids')} {...p} /> }}/>
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label={t('profile')} {...p} /> }}/>
     </Tab.Navigator>
   );
 }
@@ -353,17 +379,20 @@ function BuyerTabs() {
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="SellerRegister" component={SellerRegisterScreen} />
-        <Stack.Screen name="BuyerRegister" component={BuyerRegisterScreen} />
-        <Stack.Screen name="SellerLogin" component={SellerLoginScreen} />
-        <Stack.Screen name="BuyerLogin" component={BuyerLoginScreen} />
-        <Stack.Screen name="SellerTabs" component={SellerTabs} />
-        <Stack.Screen name="BuyerTabs" component={BuyerTabs} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <LanguageProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="SellerRegister" component={SellerRegisterScreen} />
+          <Stack.Screen name="BuyerRegister" component={BuyerRegisterScreen} />
+          <Stack.Screen name="SellerLogin" component={SellerLoginScreen} />
+          <Stack.Screen name="BuyerLogin" component={BuyerLoginScreen} />
+          <Stack.Screen name="SellerChat" component={SellerChatScreen} />
+          <Stack.Screen name="SellerTabs" component={SellerTabs} />
+          <Stack.Screen name="BuyerTabs" component={BuyerTabs} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </LanguageProvider>
   );
 }
 

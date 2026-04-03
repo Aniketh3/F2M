@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const Buyer = require('./modals/Buyer');
 const Seller = require('./modals/Seller');
+const Message = require('./modals/Message');
 const app = express();
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -365,4 +366,63 @@ app.get("/buyerNotifications", async (req, res) => {
 });
 
 app.use('/escrow', escrowRoutes);
-app.listen(3000, () => console.log("Server running on port 3000"));
+// ==========================================
+// 💬 GLOBAL CHAT ROUTES
+// ==========================================
+
+// 1. GET Messages
+app.get("/messages", async (req, res) => {
+    try {
+        const messages = await Message.find({}).sort({ timestamp: 1 });
+        res.status(200).json(messages);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching messages" });
+    }
+});
+
+// 2. POST Message
+app.post("/messages", async (req, res) => {
+    const { sender, content, role } = req.body;
+    if (!sender || !content) return res.status(400).json({ message: "Missing sender or content" });
+
+    try {
+        const newMessage = new Message({ sender, content, role: role || 'seller' });
+        await newMessage.save();
+
+        // 🔔 Notify all other sellers
+        if (role === 'seller') {
+            await Seller.updateMany(
+                { Name: { $ne: sender } }, 
+                { 
+                    $push: { 
+                        Notifications: { 
+                            type: 'ChatMessage', 
+                            message: `New community message from ${sender}`,
+                            date: new Date()
+                        } 
+                    } 
+                }
+            );
+        }
+
+        res.status(201).json(newMessage);
+    } catch (err) {
+        res.status(500).json({ message: "Error saving message" });
+    }
+});
+
+// 3. Clear Chat Notifications
+app.post("/clearChatNotifications", async (req, res) => {
+    const { username } = req.query;
+    try {
+        await Seller.findOneAndUpdate(
+            { Name: username },
+            { $pull: { Notifications: { type: 'ChatMessage' } } }
+        );
+        res.status(200).json({ message: "Notifications cleared" });
+    } catch (err) {
+        res.status(500).json({ message: "Error clearing notifications" });
+    }
+});
+
+app.listen(3000, () => console.log("Server running on port 3000"));

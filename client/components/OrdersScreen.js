@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
+import { useLanguage } from '../context/LanguageContext';
 
 const OrdersScreen = () => {
+  const { t } = useLanguage();
   const [sellItems, setSellItems] = useState('');
   const [sellQuantity, setSellQuantity] = useState('');
   const [saleAmount, setSaleAmount] = useState('');
@@ -21,17 +23,17 @@ const OrdersScreen = () => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Orders</Text>
+      <Text style={styles.title}>{t('orders')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Sell Items"
+        placeholder={t('search')}
         value={sellItems}
         onChangeText={setSellItems}
         placeholderTextColor="#aaa"
       />
       <TextInput
         style={styles.input}
-        placeholder="Sell Quantity (in kgs)"
+        placeholder={`${t('qty')} (kg)`}
         value={sellQuantity}
         onChangeText={setSellQuantity}
         keyboardType="numeric"
@@ -39,23 +41,17 @@ const OrdersScreen = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Sale Amount (in Rs)"
+        placeholder={`${t('price')} (Rs)`}
         value={saleAmount}
         onChangeText={setSaleAmount}
         keyboardType="numeric"
         placeholderTextColor="#aaa"
       />
       <View style={styles.buttonContainer}>
-        <Button title="Submit Order" onPress={handleOrder} color="#3A5A40" />
+        <Button title={t('post_listing')} onPress={handleOrder} color="#3A5A40" />
       </View>
       {totalAmount !== '' && (
-        <Text style={styles.totalAmountText}>Total Amount: ₹{totalAmount}</Text>
-      )}
-      <View style={styles.buttonContainer}>
-        <Button title="Submit Bid" onPress={handleBid} color="#3A5A40" />
-      </View>
-      {totalAmount !== '' && (
-        <Text style={styles.totalAmountText}>Total Amount: ₹{totalAmount}</Text>
+        <Text style={styles.totalAmountText}>{t('price')}: ₹{totalAmount}</Text>
       )}
     </ScrollView>
   );

@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
 const BiddingScreen = () => {
+  const { t } = useLanguage();
   const [sellerPrice, setSellerPrice] = useState('');
   const [buyerBid, setBuyerBid] = useState('');
   const [buyerName, setBuyerName] = useState('');
@@ -76,10 +78,10 @@ const BiddingScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Bidding Screen</Text>
+      <Text style={styles.title}>{t('bids')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Enter Seller's Price"
+        placeholder={t('price')}
         value={sellerPrice}
         onChangeText={setSellerPrice}
         keyboardType="numeric"
@@ -87,7 +89,7 @@ const BiddingScreen = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Enter Your Name"
+        placeholder={t('username')}
         value={buyerName}
         onChangeText={setBuyerName}
         editable={timeLeft > 0}
@@ -95,7 +97,7 @@ const BiddingScreen = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Enter Your Bid"
+        placeholder={t('bid_amount')}
         value={buyerBid}
         onChangeText={setBuyerBid}
         keyboardType="numeric"
@@ -107,24 +109,27 @@ const BiddingScreen = () => {
         onPress={handleBidSubmit}
         disabled={timeLeft <= 0}
       >
-        <Text style={styles.buttonText}>Submit Bid</Text>
+        <Text style={styles.buttonText}>{t('continue')}</Text>
       </TouchableOpacity>
       <FlatList
         data={bids}
         renderItem={({ item }) => (
-          <Text style={styles.bidItem}>
-            {item.name}: ${item.bid.toFixed(2)}
-          </Text>
+          <View style={styles.bidItem}>
+            <TranslatedText text={item.name} style={{ color: '#1B5E20' }} />
+            <Text style={{ color: '#1B5E20' }}>: ₹{item.bid.toFixed(2)}</Text>
+          </View>
         )}
         keyExtractor={item => item.id.toString()}
         style={styles.bidsList}
       />
       {winningBid && (
-        <Text style={styles.winningBid}>
-          Current Winning Bid: {winningBid.name} with ${winningBid.bid.toFixed(2)}
-        </Text>
+        <View style={styles.winningBidContainer}>
+          <Text style={styles.winningBid}>{t('status')}: </Text>
+          <TranslatedText text={winningBid.name} style={styles.winningBid} />
+          <Text style={styles.winningBid}> (₹{winningBid.bid.toFixed(2)})</Text>
+        </View>
       )}
-      <Text style={styles.timer}>Time Left: {formatTime(timeLeft)}</Text>
+      <Text style={styles.timer}>{t('status')}: {formatTime(timeLeft)}</Text>
     </View>
   );
 };

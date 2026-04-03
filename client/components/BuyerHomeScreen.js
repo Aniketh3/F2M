@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -38,6 +39,7 @@ const COLORS = {
 };
 
 const BuyerHomeScreen = () => {
+  const { t, language, changeLanguage } = useLanguage();
   // Data State
   const [market, setMarket] = useState([]);
   const [groupedItems, setGroupedItems] = useState([]);
@@ -187,9 +189,9 @@ const BuyerHomeScreen = () => {
               orderID: item.OrderID,
               itemName: item.SellItem
           });
-          Alert.alert("Success", `Request sent to ${item.sellerName}! They have been notified.`);
+          Alert.alert(t('success'), `Request sent to ${item.sellerName}! They have been notified.`);
       } catch (err) {
-          Alert.alert("Error", "Could not send buy request.");
+          Alert.alert(t('error'), "Could not send buy request.");
       }
   };
 
@@ -220,20 +222,20 @@ const BuyerHomeScreen = () => {
         </View>
         
         <View style={styles.cardInfo}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{item.name}</Text>
+          <TranslatedText style={styles.cardTitle} text={item.name} numberOfLines={1} />
           <Text style={styles.cardSub}>
-            {item.sellers.length} {item.sellers.length === 1 ? 'Seller' : 'Sellers'}
+            {item.sellers.length} {item.sellers.length === 1 ? t('sellers').slice(0,-1) : t('sellers')}
           </Text>
           
           <View style={styles.priceBadge}>
             <Text style={styles.priceText}>
-              Starts ₹{item.minPrice}
+              {t('starts')} ₹{item.minPrice}
             </Text>
           </View>
         </View>
         
         <View style={styles.qtyBadge}>
-          <Text style={styles.qtyText}>{item.totalQty}kg Vol</Text>
+          <Text style={styles.qtyText}>{item.totalQty}kg {t('market')}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -243,27 +245,27 @@ const BuyerHomeScreen = () => {
   const renderSellerRow = ({ item }) => (
     <View style={styles.sellerRow}>
       <View style={styles.sellerInfo}>
-        <Text style={styles.sellerName}>{item.sellerName}</Text>
+        <TranslatedText style={styles.sellerName} text={item.sellerName} />
         <View style={styles.sellerMeta}>
           <MaterialCommunityIcons name="weight-kilogram" size={14} color={COLORS.textSec} />
-          <Text style={styles.sellerMetaText}>{item.SellQuantity} kg available</Text>
+          <Text style={styles.sellerMetaText}>{item.SellQuantity} {t('kg_available')}</Text>
         </View>
         <View style={styles.sellerMeta}>
           <MaterialCommunityIcons name="star" size={14} color={COLORS.primary} />
-          <Text style={styles.sellerMetaText}>4.8 Rating</Text>
+          <Text style={styles.sellerMetaText}>4.8 {t('rating')}</Text>
         </View>
       </View>
       
       <View style={styles.priceAction}>
         <Text style={styles.sellerPrice}>₹{item.SaleAmount/item.SellQuantity}<Text style={{fontSize:12, fontWeight:'400'}}>/kg</Text></Text>
         <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuy(item)}>
-          <Text style={styles.buyBtnText}>Buy</Text>
+          <Text style={styles.buyBtnText}>{t('buy')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
            style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center' }} 
-           onPress={() => Alert.alert("Transit Status", `The current status of this produce is: ${item.TransactionStatus || 'Pending'}`)}>
+           onPress={() => Alert.alert(t('status'), `The current status of this produce is: ${item.TransactionStatus || t('pending')}`)}>
            <MaterialCommunityIcons name="information-outline" size={16} color={COLORS.primary} />
-           <Text style={{ fontSize: 12, color: COLORS.primary, marginLeft: 4 }}>Track Status</Text>
+           <Text style={{ fontSize: 12, color: COLORS.primary, marginLeft: 4 }}>{t('track_status')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -296,7 +298,7 @@ const BuyerHomeScreen = () => {
                           <Text style={styles.notifPhone}>Status: <Text style={{fontWeight: 'bold', color: item.status === 'Accepted' ? COLORS.success : (item.status === 'Rejected' ? COLORS.error : COLORS.textMain)}}>{item.status}</Text></Text>
                        </View>
                    )}
-                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20, color: COLORS.textSec }}>No new notifications.</Text>}
+                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20, color: COLORS.textSec }}>{t('no_notifs')}</Text>}
                 />
              </View>
           </View>
@@ -309,13 +311,13 @@ const BuyerHomeScreen = () => {
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View>
-             <Text style={styles.welcomeText}>Fresh Market</Text>
-             <Text style={styles.subWelcome}>Source directly from farms</Text>
+             <Text style={styles.welcomeText}>{t('fresh_market')}</Text>
+             <Text style={styles.subWelcome}>{t('source_direct')}</Text>
           </View>
           <TouchableOpacity onPress={() => setShowNotifModal(true)} style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20}}>
-             <MaterialCommunityIcons name="bell" size={24} color="#FFF" />
-             {notifications.length > 0 && <View style={styles.notifBadge} />}
-          </TouchableOpacity>
+               <MaterialCommunityIcons name="bell" size={24} color="#FFF" />
+               {notifications.length > 0 && <View style={styles.notifBadge} />}
+            </TouchableOpacity>
         </View>
         
         {/* Search Bar */}
@@ -323,7 +325,7 @@ const BuyerHomeScreen = () => {
           <Feather name="search" size={20} color={COLORS.textSec} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search produce (e.g. Tomato)..."
+            placeholder={t('search')}
             value={search}
             onChangeText={handleSearch}
             placeholderTextColor="#94A3B8"
@@ -334,7 +336,7 @@ const BuyerHomeScreen = () => {
       {/* 2. BODY CONTENT */}
       <View style={styles.body}>
         <View style={styles.listHeader}>
-          <Text style={styles.sectionTitle}>Browse Categories</Text>
+          <Text style={styles.sectionTitle}>{t('browse_categories')}</Text>
           <TouchableOpacity onPress={fetchMarket}>
              <MaterialCommunityIcons name="refresh" size={22} color={COLORS.textSec} />
           </TouchableOpacity>
@@ -374,8 +376,8 @@ const BuyerHomeScreen = () => {
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>{selectedProduce?.name}</Text>
-                <Text style={styles.modalSub}>{selectedProduce?.sellers.length} sellers available</Text>
+                <TranslatedText style={styles.modalTitle} text={selectedProduce?.name || ""} />
+                <Text style={styles.modalSub}>{selectedProduce?.sellers.length} {t('sellers')} {t('active')}</Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedProduce(null)} style={styles.closeBtn}>
                 <Feather name="x" size={24} color={COLORS.textMain} />
@@ -386,7 +388,7 @@ const BuyerHomeScreen = () => {
             <View style={styles.aiCard}>
               <View style={styles.aiHeader}>
                 <MaterialCommunityIcons name="robot" size={20} color="#fff" />
-                <Text style={styles.aiTitle}>AI Price Insight</Text>
+                <Text style={styles.aiTitle}>{t('ai_price_insight')}</Text>
               </View>
               
               {loadingPrediction ? (
@@ -411,7 +413,7 @@ const BuyerHomeScreen = () => {
             </View>
 
             {/* Sellers List */}
-            <Text style={styles.listLabel}>Available Sellers</Text>
+            <Text style={styles.listLabel}>{t('sellers')}</Text>
             <FlatList
               data={produceSellers}
               renderItem={renderSellerRow}
