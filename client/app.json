@@ -4,7 +4,7 @@
     "slug": "Farm2Market",
     "version": "1.0.0",
     "orientation": "portrait",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -16,6 +16,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.farm2market.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -23,6 +24,22 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Farm2Market to access your camera."
+        }
+      ],
+      "expo-location",
+      "expo-image-picker",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b2152b06-f745-411c-a465-34cdb4064e12"
+      }
     }
   }
 }

@@ -1,0 +1,14 @@
+﻿
+ID            5a9e7eca-0fab-4667-94f3-18e0d366c57c
+Platform      Android
+Status        errored
+Profile       preview
+Distribution  internal
+SDK Version   54.0.0
+Version       1.0.0
+Version code  1
+Commit        9aae87b33ebbec507b93e4f6524cfe7539cb4163
+Logs          https://expo.dev/accounts/aravindkvishwanath/projects/Farm2Market/builds/5a9e7eca-0fab-4667-94f3-18e0d366c57c
+Started at    4/4/2026, 9:47:45 am
+Finished at   4/4/2026, 9:50:44 am
+Started by    aravindkvishwanath

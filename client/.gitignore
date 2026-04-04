@@ -7,3 +7,5 @@ yarn-error.*
 .env
 .env.*
 !.env.example
+android/
+ios/
