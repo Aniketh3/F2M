@@ -311,25 +311,6 @@ const TabIcon = ({ name, color, focused, label }) => (
   </View>
 );
 
-const LanguageSwitcherTab = (props) => {
-  const context = React.useContext(LanguageContext);
-  if (!context) return null;
-  const { language, changeLanguage } = context;
-
-  return (
-    <TouchableOpacity 
-      {...props}
-      style={[styles.tabItem, props.style]} 
-      onPress={() => {
-        const next = language === 'en' ? 'kn' : (language === 'kn' ? 'hi' : 'en');
-        changeLanguage(next);
-      }}
-    >
-      <MaterialCommunityIcons name="translate" size={24} color={props.color || "#94A3B8"} />
-      <Text style={[styles.tabLabel, { color: props.color || "#94A3B8", textTransform: 'uppercase' }]}>{language}</Text>
-    </TouchableOpacity>
-  );
-};
 
 function SellerTabs() {
   const { t } = useLanguage();
@@ -345,7 +326,6 @@ function SellerTabs() {
     >
       <Tab.Screen name="Home" component={SellerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="home-variant-outline" label={t('home')} {...p} /> }}/>
       <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="clipboard-text-outline" label={t('orders')} {...p} /> }}/>
-      <Tab.Screen name="Language" component={View} options={{ tabBarButton: (p) => <LanguageSwitcherTab {...p} color="#94A3B8" /> }} />
       <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="gavel" label={t('bids')} {...p} /> }}/>
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label={t('profile')} {...p} /> }}/>
     </Tab.Navigator>
@@ -366,7 +346,6 @@ function BuyerTabs() {
     >
       <Tab.Screen name="Home" component={BuyerHomeScreen} options={{ tabBarIcon: (p) => <TabIcon name="storefront-outline" label={t('market')} {...p} /> }}/>
       <Tab.Screen name="Orders" component={OrdersScreen} options={{ tabBarIcon: (p) => <TabIcon name="shopping-outline" label={t('orders')} {...p} /> }}/>
-      <Tab.Screen name="Language" component={View} options={{ tabBarButton: (p) => <LanguageSwitcherTab {...p} color="#94A3B8" /> }} />
       <Tab.Screen name="Bids" component={BidsScreen} options={{ tabBarIcon: (p) => <TabIcon name="ticket-percent-outline" label={t('bids')} {...p} /> }}/>
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: (p) => <TabIcon name="account-circle-outline" label={t('profile')} {...p} /> }}/>
     </Tab.Navigator>

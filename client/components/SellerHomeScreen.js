@@ -69,6 +69,8 @@ const SellerHomeScreen = ({ navigation }) => {
   
   const [notifications, setNotifications] = useState([]);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   useFocusEffect(
     useCallback(() => { fetchData(); }, [])
@@ -326,22 +328,19 @@ const SellerHomeScreen = ({ navigation }) => {
       {/* HEADER */}
       <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.header}>
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>{t('welcome_back')}</Text>
-            <Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={styles.menuIcon} 
+              onPress={() => setSideMenuVisible(true)}
+            >
+              <Feather name="menu" size={28} color="#fff" />
+            </TouchableOpacity>
+            <View>
+              <Text style={styles.greeting}>{t('welcome_back')}</Text>
+              <Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text>
+            </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('SellerChat')}>
-              <MaterialCommunityIcons name="message-text-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addButton} onPress={() => setShowNotifModal(true)}>
-              <MaterialCommunityIcons name="bell" size={20} color="#fff" />
-              {notifications.length > 0 && <View style={styles.notifBadge} />}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addButton} onPress={handleOpenScan}>
-              <MaterialCommunityIcons name="qrcode-scan" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>{t('scan')}</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
               <Feather name="plus" size={20} color="#fff" />
               <Text style={styles.addButtonText}>{t('add')}</Text>
@@ -515,6 +514,108 @@ const SellerHomeScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* 🍔 SIDE HAMBURGER MENU */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={() => setSideMenuVisible(false)}
+      >
+        <View style={styles.drawerOverlay}>
+          <TouchableOpacity 
+            style={styles.drawerCloseArea} 
+            onPress={() => setSideMenuVisible(false)} 
+          />
+          <View style={styles.drawerContent}>
+            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.drawerHeader}>
+              <Text style={styles.drawerTitle}>Farm2Market</Text>
+              <Text style={styles.drawerSub}>{sellerName}</Text>
+            </LinearGradient>
+
+            <View style={styles.drawerItems}>
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => { setSideMenuVisible(false); handleOpenScan(); }}
+              >
+                <MaterialCommunityIcons name="qrcode-scan" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>{t('scan')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => { setSideMenuVisible(false); setShowNotifModal(true); }}
+              >
+                <MaterialCommunityIcons name="bell-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Notifications</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => { setSideMenuVisible(false); navigation.navigate('SellerChat'); }}
+              >
+                <MaterialCommunityIcons name="message-text-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Community Chat</Text>
+              </TouchableOpacity>
+
+              <View style={styles.drawerDivider} />
+
+              {/* Language Section */}
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => setShowLangDropdown(!showLangDropdown)}
+              >
+                <MaterialCommunityIcons name="translate" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Change Language</Text>
+                <Feather 
+                  name={showLangDropdown ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={COLORS.textSec} 
+                  style={{ marginLeft: 'auto' }}
+                />
+              </TouchableOpacity>
+
+              {showLangDropdown && (
+                <View style={styles.langList}>
+                  {[
+                    { id: 'en', label: 'English' },
+                    { id: 'hi', label: 'Hindi' },
+                    { id: 'kn', label: 'Kannada' },
+                    { id: 'ta', label: 'Tamil' },
+                    { id: 'te', label: 'Telugu' },
+                    { id: 'ml', label: 'Malayalam' },
+                  ].map((langObj) => (
+                    <TouchableOpacity 
+                      key={langObj.id} 
+                      style={[styles.langOption, language === langObj.id && styles.activeLang]} 
+                      onPress={() => {
+                        changeLanguage(langObj.id);
+                        setSideMenuVisible(false);
+                      }}
+                    >
+                      <Text style={[styles.langLabel, language === langObj.id && styles.activeLangLabel]}>
+                        {langObj.label}
+                      </Text>
+                      {language === langObj.id && <Feather name="check" size={16} color={COLORS.primary} />}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity 
+              style={styles.logoutBtn} 
+              onPress={async () => {
+                await AsyncStorage.clear();
+                navigation.replace('SellerLogin');
+              }}
+            >
+              <Feather name="log-out" size={20} color={COLORS.danger} />
+              <Text style={styles.logoutText}>{t('logout')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -570,7 +671,25 @@ const styles = StyleSheet.create({
   notifBadge: { position: 'absolute', top: 5, right: 5, width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.danger },
   notifCard: { backgroundColor: '#F1F5F9', padding: 15, borderRadius: 12, marginBottom: 10 },
   notifMsg: { fontSize: 15, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
-  notifPhone: { fontSize: 13, color: COLORS.textSec }
+  notifPhone: { fontSize: 13, color: COLORS.textSec },
+  menuIcon: { marginRight: 15, padding: 5 },
+  drawerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row' },
+  drawerCloseArea: { flex: 1 },
+  drawerContent: { width: '80%', backgroundColor: '#fff', height: '100%', shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 10 },
+  drawerHeader: { padding: 40, paddingTop: 60 },
+  drawerTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  drawerSub: { color: '#D1FAE5', fontSize: 14, marginTop: 5 },
+  drawerItems: { padding: 20 },
+  drawerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  drawerItemText: { marginLeft: 15, fontSize: 16, color: COLORS.textMain, fontWeight: '500' },
+  drawerDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 10 },
+  langList: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, marginTop: 5 },
+  langOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 8 },
+  activeLang: { backgroundColor: '#ECFDF5' },
+  langLabel: { fontSize: 15, color: COLORS.textMain },
+  activeLangLabel: { color: COLORS.primary, fontWeight: 'bold' },
+  logoutBtn: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 12, borderWeight: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2' },
+  logoutText: { marginLeft: 10, color: COLORS.danger, fontWeight: 'bold', fontSize: 16 }
 });
 
 export default SellerHomeScreen;

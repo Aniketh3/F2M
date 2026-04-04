@@ -20,7 +20,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
@@ -39,6 +39,7 @@ const COLORS = {
 };
 
 const BuyerHomeScreen = () => {
+  const navigation = useNavigation();
   const { t, language, changeLanguage } = useLanguage();
   // Data State
   const [market, setMarket] = useState([]);
@@ -51,6 +52,8 @@ const BuyerHomeScreen = () => {
   // Custom states added for Notifs
   const [notifications, setNotifications] = useState([]);
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const [sideMenuVisible, setSideMenuVisible] = useState(false);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   // Buyer Info
   const [buyerName, setBuyerName] = useState('');
@@ -309,15 +312,17 @@ const BuyerHomeScreen = () => {
         colors={[COLORS.primary, COLORS.primaryDark]}
         style={styles.header}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+          <TouchableOpacity 
+            style={styles.menuIcon} 
+            onPress={() => setSideMenuVisible(true)}
+          >
+            <Feather name="menu" size={28} color="#fff" />
+          </TouchableOpacity>
           <View>
              <Text style={styles.welcomeText}>{t('fresh_market')}</Text>
              <Text style={styles.subWelcome}>{t('source_direct')}</Text>
           </View>
-          <TouchableOpacity onPress={() => setShowNotifModal(true)} style={{ padding: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20}}>
-               <MaterialCommunityIcons name="bell" size={24} color="#FFF" />
-               {notifications.length > 0 && <View style={styles.notifBadge} />}
-            </TouchableOpacity>
         </View>
         
         {/* Search Bar */}
@@ -421,6 +426,92 @@ const BuyerHomeScreen = () => {
               contentContainerStyle={{ paddingBottom: 30 }}
             />
 
+          </View>
+        </View>
+      </Modal>
+
+      {/* 🍔 SIDE HAMBURGER MENU (BUYER) */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={sideMenuVisible}
+        onRequestClose={() => setSideMenuVisible(false)}
+      >
+        <View style={styles.drawerOverlay}>
+          <TouchableOpacity 
+            style={styles.drawerCloseArea} 
+            onPress={() => setSideMenuVisible(false)} 
+          />
+          <View style={styles.drawerContent}>
+            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.drawerHeader}>
+              <Text style={styles.drawerTitle}>Farm2Market</Text>
+              <Text style={styles.drawerSub}>{buyerName || 'Buyer'}</Text>
+            </LinearGradient>
+
+            <View style={styles.drawerItems}>
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => { setSideMenuVisible(false); setShowNotifModal(true); }}
+              >
+                <MaterialCommunityIcons name="bell-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Notifications</Text>
+              </TouchableOpacity>
+
+              <View style={styles.drawerDivider} />
+
+              {/* Language Section */}
+              <TouchableOpacity 
+                style={styles.drawerItem} 
+                onPress={() => setShowLangDropdown(!showLangDropdown)}
+              >
+                <MaterialCommunityIcons name="translate" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Change Language</Text>
+                <Feather 
+                  name={showLangDropdown ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={COLORS.textSec} 
+                  style={{ marginLeft: 'auto' }}
+                />
+              </TouchableOpacity>
+
+              {showLangDropdown && (
+                <View style={styles.langList}>
+                  {[
+                    { id: 'en', label: 'English' },
+                    { id: 'hi', label: 'Hindi' },
+                    { id: 'kn', label: 'Kannada' },
+                    { id: 'ta', label: 'Tamil' },
+                    { id: 'te', label: 'Telugu' },
+                    { id: 'ml', label: 'Malayalam' },
+                  ].map((langObj) => (
+                    <TouchableOpacity 
+                      key={langObj.id} 
+                      style={[styles.langOption, language === langObj.id && styles.activeLang]} 
+                      onPress={() => {
+                        changeLanguage(langObj.id);
+                        setSideMenuVisible(false);
+                      }}
+                    >
+                      <Text style={[styles.langLabel, language === langObj.id && styles.activeLangLabel]}>
+                        {langObj.label}
+                      </Text>
+                      {language === langObj.id && <Feather name="check" size={16} color={COLORS.primary} />}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity 
+              style={styles.logoutBtn} 
+              onPress={async () => {
+                await AsyncStorage.clear();
+                navigation.replace('BuyerLogin');
+              }}
+            >
+              <Feather name="log-out" size={20} color={COLORS.error} />
+              <Text style={styles.logoutText}>{t('logout')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -725,7 +816,25 @@ const styles = StyleSheet.create({
   notifBadge: { position: 'absolute', top: 5, right: 8, width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.error, borderWidth: 2, borderColor: COLORS.primary },
   notifCard: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2 },
   notifMsg: { fontSize: 16, fontWeight: '700', color: COLORS.textMain, marginBottom: 5 },
-  notifPhone: { fontSize: 13, color: COLORS.textSec }
+  notifPhone: { fontSize: 13, color: COLORS.textSec },
+  menuIcon: { marginRight: 15, padding: 5 },
+  drawerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row' },
+  drawerCloseArea: { flex: 1 },
+  drawerContent: { width: '80%', backgroundColor: '#fff', height: '100%', shadowColor: '#000', shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10, elevation: 10 },
+  drawerHeader: { padding: 40, paddingTop: 60 },
+  drawerTitle: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  drawerSub: { color: '#FEF3C7', fontSize: 14, marginTop: 5 },
+  drawerItems: { padding: 20 },
+  drawerItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  drawerItemText: { marginLeft: 15, fontSize: 16, color: COLORS.textMain, fontWeight: '500' },
+  drawerDivider: { height: 1, backgroundColor: COLORS.border, marginVertical: 10 },
+  langList: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, marginTop: 5 },
+  langOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 8 },
+  activeLang: { backgroundColor: '#FEF3C7' },
+  langLabel: { fontSize: 15, color: COLORS.textMain },
+  activeLangLabel: { color: COLORS.primaryDark, fontWeight: 'bold' },
+  logoutBtn: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 12, borderWeight: 1, borderColor: '#FEF2F2', backgroundColor: '#FEF2F2' },
+  logoutText: { marginLeft: 10, color: COLORS.error, fontWeight: 'bold', fontSize: 16 }
 });
 
 export default BuyerHomeScreen;
