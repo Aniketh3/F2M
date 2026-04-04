@@ -28,6 +28,8 @@ import OrdersScreen from './components/OrdersScreen';
 import ProfileScreen from './components/ProfileScreen';
 import BidsScreen from './components/BidsScreen';
 import SellerChatScreen from './components/SellerChatScreen';
+import ChatListScreen from './components/ChatListScreen';
+import PrivateChatScreen from './components/PrivateChatScreen';
 import { LanguageProvider, useLanguage, LanguageContext, TranslatedText } from './context/LanguageContext';
 
 const Stack = createStackNavigator();
@@ -367,6 +369,8 @@ export default function App() {
           <Stack.Screen name="SellerLogin" component={SellerLoginScreen} />
           <Stack.Screen name="BuyerLogin" component={BuyerLoginScreen} />
           <Stack.Screen name="SellerChat" component={SellerChatScreen} />
+          <Stack.Screen name="ChatList" component={ChatListScreen} />
+          <Stack.Screen name="PrivateChat" component={PrivateChatScreen} />
           <Stack.Screen name="SellerTabs" component={SellerTabs} />
           <Stack.Screen name="BuyerTabs" component={BuyerTabs} />
         </Stack.Navigator>

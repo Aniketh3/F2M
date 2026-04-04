@@ -10,18 +10,18 @@ const bodyParser = require('body-parser');
 const escrowRoutes = require('./routes/escrow');
 const crypto = require('crypto');
 
-const SECRET_KEY = 'Farm2Market'; 
+const SECRET_KEY = 'Farm2Market';
 
 // Middleware
 app.use(cors({ origin: '*', credentials: true }));
 app.use(bodyParser.json());
 
 // MongoDB Connection
-mongoose.connect("mongodb+srv://aravind:aravind@cluster0.pjj53wk.mongodb.net/", { 
-    useNewUrlParser: true, 
-    useUnifiedTopology: true 
+mongoose.connect("mongodb+srv://aravind:aravind@cluster0.pjj53wk.mongodb.net/", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
 }).then(() => console.log("Connected to Mongo DB"))
-  .catch((err) => console.log("Error connecting to mongo DB", err));
+    .catch((err) => console.log("Error connecting to mongo DB", err));
 
 // Helpers
 function generateToken(username, pin) {
@@ -54,9 +54,9 @@ const verifyToken = (req, res, next) => {
 app.get('/profile', verifyToken, async (req, res) => {
     try {
         const { username } = req.user;
-        
+
         // Check Seller
-        const seller = await Seller.findOne({ Name: username });
+        const seller = await Seller.findOne({ Name: new RegExp(`^${username.trim()}$`, 'i') });
         if (seller) {
             const completedSales = seller.MySellList.filter(item => item.isTransactionComplete);
             const totalEarnings = completedSales.reduce((sum, item) => sum + (item.SaleAmount || 0), 0);
@@ -67,9 +67,9 @@ app.get('/profile', verifyToken, async (req, res) => {
         }
 
         // Check Buyer
-        const buyer = await Buyer.findOne({ Name: username });
+        const buyer = await Buyer.findOne({ Name: new RegExp(`^${username.trim()}$`, 'i') });
         if (buyer) {
-            const buyerOrders = buyer.Orders || []; 
+            const buyerOrders = buyer.Orders || [];
             const totalSpent = buyerOrders.reduce((sum, item) => sum + (item.TotalPrice || 0), 0);
             return res.status(200).json({
                 success: true, role: 'buyer',
@@ -85,13 +85,11 @@ app.put('/profile/update', verifyToken, async (req, res) => {
     try {
         const { username } = req.user;
         const updates = req.body; // { PhoneNumber, Email, Address, GSTNumber, etc. }
-        
+
         // Try updating Seller
-        let user = await Seller.findOneAndUpdate({ Name: username }, { $set: updates }, { new: true });
-        
-        // If not seller, try Buyer
+        let user = await Seller.findOneAndUpdate({ Name: new RegExp(`^${username.trim()}$`, 'i') }, { $set: updates }, { new: true });
         if (!user) {
-            user = await Buyer.findOneAndUpdate({ Name: username }, { $set: updates }, { new: true });
+            user = await Buyer.findOneAndUpdate({ Name: new RegExp(`^${username.trim()}$`, 'i') }, { $set: updates }, { new: true });
         }
 
         if (user) {
@@ -109,22 +107,22 @@ app.put('/profile/update', verifyToken, async (req, res) => {
 // ==========================================
 
 // 1. GET Seller's Sales (Fixed Missing Route)
-app.get("/sellerSaleList", async(req,res)=>{
+app.get("/sellerSaleList", async (req, res) => {
     const username = req.query.username;
     try {
-        const seller = await Seller.findOne({Name:username});
-        if(seller){
-            res.status(200).json({seller:seller.MySellList, notifications: seller.Notifications});
+        const seller = await Seller.findOne({ Name: new RegExp(`^${username.trim()}$`, 'i') });
+        if (seller) {
+            res.status(200).json({ seller: seller.MySellList, notifications: seller.Notifications });
         } else {
-            res.status(403).json({seller:[], notifications: []});
+            res.status(403).json({ seller: [], notifications: [] });
         }
-    } catch(err){ res.status(500).send("Error"); }
+    } catch (err) { res.status(500).send("Error"); }
 });
 
 // 2. Add New Sale
-app.post("/sellerSale", async(req,res)=>{
+app.post("/sellerSale", async (req, res) => {
     const username = req.query.username;
-    const {SellItem,SellQuantity,SaleAmount} = req.body;
+    const { SellItem, SellQuantity, SaleAmount } = req.body;
     try {
         const orderID = generateOrderId();
         const selllist = {
@@ -133,30 +131,30 @@ app.post("/sellerSale", async(req,res)=>{
             TransactionStatus: "Pending",
             SellItem, SellQuantity, SaleAmount
         };
-        await Seller.findOneAndUpdate({Name: username}, {$push:{MySellList: selllist}}, {new:true});
-        res.status(200).json({message:"Sale List Updated Successfully", orderID});
-    } catch(err){ res.status(500).json({message:"Error"}); }
+        await Seller.findOneAndUpdate({ Name: new RegExp(`^${username.trim()}$`, 'i') }, { $push: { MySellList: selllist } }, { new: true });
+        res.status(200).json({ message: "Sale List Updated Successfully", orderID });
+    } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
 // 3. Market View (For Buyers)
-app.get("/market-view", async(req,res)=>{
+app.get("/market-view", async (req, res) => {
     try {
         const sellers = await Seller.aggregate([
             { $project: { Name: 1, PhoneNumber: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $eq: ['$$sell.isTransactionComplete', false] } } } } }
         ]);
         res.status(200).json(sellers);
-    } catch(err){ res.status(500).json({message:"Error"}); }
+    } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
 // Search
-app.post("/market-search",async(req,res)=>{
+app.post("/market-search", async (req, res) => {
     try {
-        const {item} = req.body;
+        const { item } = req.body;
         const sellers = await Seller.aggregate([
-            { $project: { Name: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $and: [ { $eq: ['$$sell.isTransactionComplete', false] }, { $eq: [`$$sell.SellItem`, item] } ] } } } } }
+            { $project: { Name: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $and: [{ $eq: ['$$sell.isTransactionComplete', false] }, { $eq: [`$$sell.SellItem`, item] }] } } } } }
         ]);
         res.status(200).json(sellers);
-    } catch(err){ res.status(500).json({message:"Error"}); }
+    } catch (err) { res.status(500).json({ message: "Error" }); }
 });
 
 // ==========================================
@@ -165,20 +163,20 @@ app.post("/market-search",async(req,res)=>{
 // DEBUGGING LOGIN ROUTE
 app.post("/seller/login", async (req, res) => {
     const { Name, PIN } = req.body;
-    
+
     // 1. Print what the Frontend sent
     console.log("--------------- LOGIN ATTEMPT ---------------");
     console.log("Input received:", { Name, PIN, TypeOfPIN: typeof PIN });
 
     // 2. Try to find the user
-    // Note: We use .trim() to ignore accidental spaces
-    const user = await Seller.findOne({ Name: Name.trim() });
+    // Note: We use .trim() and case-insensitive regex to handle all formatting
+    const user = await Seller.findOne({ Name: new RegExp(`^${Name.trim()}$`, 'i') });
 
     // 3. Print what the Database found
     if (!user) {
         console.log("❌ User NOT found in Database.");
         // Try printing all users to see what exists (Helpful for debugging)
-        const allUsers = await Seller.find({}, 'Name'); 
+        const allUsers = await Seller.find({}, 'Name');
         console.log("Available Users in DB:", allUsers.map(u => u.Name));
         return res.status(401).json({ message: "User does not exist" });
     }
@@ -256,7 +254,7 @@ app.post("/seller/register", async (req, res) => {
 
 app.post("/buyer/login", async (req, res) => {
     const { Name, PIN } = req.body;
-    const user = await Buyer.findOne({ Name });
+    const user = await Buyer.findOne({ Name: new RegExp(`^${Name.trim()}$`, 'i') });
     if (!user || user.PIN != PIN) return res.status(401).json({ message: "Invalid credentials" });
     const { token, hash } = generateToken(Name, PIN);
     res.status(200).json({ message: "Success", token, hash });
@@ -291,10 +289,10 @@ app.post("/decode-qr", async (req, res) => {
     try {
         const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
         const buffer = Buffer.from(base64Data, "base64");
-        
+
         const image = await Jimp.read(buffer);
         const qrCode = jsQR(new Uint8ClampedArray(image.bitmap.data), image.bitmap.width, image.bitmap.height);
-        
+
         if (qrCode && qrCode.data) {
             res.status(200).json({ data: qrCode.data });
         } else {
@@ -318,22 +316,23 @@ app.post("/buyProduce", async (req, res) => {
             itemName,
             status: "Pending"
         };
-        await Seller.findOneAndUpdate({ Name: sellerName }, { $push: { Notifications: notif } }, { new: true });
+        await Seller.findOneAndUpdate({ Name: new RegExp(`^${sellerName.trim()}$`, 'i') }, { $push: { Notifications: notif } }, { new: true });
         res.status(200).json({ message: "Notification sent to Seller" });
-    } catch(err) {
+    } catch (err) {
         res.status(500).json({ message: "Error notifying seller" });
     }
 });
 
 app.post("/respondBuyRequest", async (req, res) => {
-    const { sellerName, buyerName, orderID, itemName, status } = req.body; // status is "Accepted" or "Rejected"
+    const { sellerName, buyerName, orderID, itemName, status } = req.body;
     try {
-        // 1. Update Seller's notification status
-        await Seller.updateOne(
-            { Name: sellerName, "Notifications.orderID": orderID, "Notifications.buyerName": buyerName },
-            { $set: { "Notifications.$.status": status } }
+        // 1. Update ALL duplicate notifications for this order at once
+        await Seller.updateMany(
+            { Name: new RegExp(sellerName.trim(), 'i') },
+            { $set: { "Notifications.$[elem].status": status } },
+            { arrayFilters: [{ "elem.orderID": orderID, "elem.buyerName": buyerName }] }
         );
-        
+
         // 2. Add Notification to Buyer
         const buyerNotif = {
             type: "OrderUpdate",
@@ -343,14 +342,17 @@ app.post("/respondBuyRequest", async (req, res) => {
             itemName,
             status
         };
-        await Buyer.findOneAndUpdate({ Name: buyerName }, { $push: { Notifications: buyerNotif } });
-        
-        res.status(200).json({ message: "Response sent to Buyer" });
-    } catch(err) {
+        await Buyer.findOneAndUpdate(
+            { Name: new RegExp(buyerName.trim(), 'i') },
+            { $push: { Notifications: buyerNotif } }
+        );
+
+        res.status(200).json({ message: "Response sent to Buyer", success: true });
+    } catch (err) {
+        console.error("Error in respondBuyRequest:", err);
         res.status(500).json({ message: "Error responding to request" });
     }
 });
-
 app.get("/buyerNotifications", async (req, res) => {
     const { username } = req.query;
     try {
@@ -370,13 +372,67 @@ app.use('/escrow', escrowRoutes);
 // 💬 GLOBAL CHAT ROUTES
 // ==========================================
 
-// 1. GET Messages
+// 1. GET Community Messages
 app.get("/messages", async (req, res) => {
     try {
-        const messages = await Message.find({}).sort({ timestamp: 1 });
+        const messages = await Message.find({ chatType: 'community' }).sort({ timestamp: 1 });
         res.status(200).json(messages);
     } catch (err) {
         res.status(500).json({ message: "Error fetching messages" });
+    }
+});
+
+// 1b. GET Private Messages
+app.get("/private-messages", async (req, res) => {
+    const { user1, user2 } = req.query;
+    try {
+        const messages = await Message.find({
+            chatType: 'private',
+            $or: [
+                { sender: user1, recipient: user2 },
+                { sender: user2, recipient: user1 }
+            ]
+        }).sort({ timestamp: 1 });
+        res.status(200).json(messages);
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching private messages" });
+    }
+});
+
+// 1c. GET Chat Connections (Accepted Requests)
+app.get("/chat-connections", async (req, res) => {
+    const { username, role } = req.query;
+    try {
+        const searchRegex = new RegExp(username.trim(), 'i'); // Looser, safer matching
+
+        if (role === 'seller') {
+            const seller = await Seller.findOne({ Name: searchRegex });
+            if (!seller) return res.status(200).json({ connections: [] }); // 🚨 Fixes the 404 Error!
+
+            const acceptedBuyers = seller.Notifications
+                .filter(n => n.type === 'BuyRequest' && (n.status === 'Accepted' || n.status === 'accepted'))
+                .map(n => ({ name: n.buyerName, role: 'buyer' }));
+
+            const unique = Array.from(new Set(acceptedBuyers.map(b => b.name)))
+                .map(name => acceptedBuyers.find(b => b.name === name));
+
+            res.status(200).json({ connections: unique });
+        } else {
+            const buyer = await Buyer.findOne({ Name: searchRegex });
+            if (!buyer) return res.status(200).json({ connections: [] }); // 🚨 Fixes the 404 Error!
+
+            const acceptedSellers = buyer.Notifications
+                .filter(n => n.type === 'OrderUpdate' && (n.status === 'Accepted' || n.status === 'accepted'))
+                .map(n => ({ name: n.sellerName, role: 'seller' }));
+
+            const unique = Array.from(new Set(acceptedSellers.map(s => s.name)))
+                .map(name => acceptedSellers.find(s => s.name === name));
+
+            res.status(200).json({ connections: unique });
+        }
+    } catch (err) {
+        console.error("Connection fetch error:", err);
+        res.status(500).json({ message: "Error fetching connections" });
     }
 });
 
@@ -388,9 +444,11 @@ app.post("/messages", async (req, res) => {
     }
 
     try {
-        const newMessage = new Message({ 
-            sender, 
-            content, 
+        const newMessage = new Message({
+            sender,
+            recipient: req.body.recipient || null,
+            chatType: req.body.chatType || 'community',
+            content,
             role: role || 'seller',
             imageUrl,
             audioUrl,
@@ -398,18 +456,18 @@ app.post("/messages", async (req, res) => {
         });
         await newMessage.save();
 
-        // 🔔 Notify all other sellers
-        if (role === 'seller') {
+        // 🔔 Notify for community chat (sellers only)
+        if (newMessage.chatType === 'community' && role === 'seller') {
             await Seller.updateMany(
-                { Name: { $ne: sender } }, 
-                { 
-                    $push: { 
-                        Notifications: { 
-                            type: 'ChatMessage', 
+                { Name: { $ne: sender } },
+                {
+                    $push: {
+                        Notifications: {
+                            type: 'ChatMessage',
                             message: `New community message from ${sender}`,
                             date: new Date()
-                        } 
-                    } 
+                        }
+                    }
                 }
             );
         }
@@ -445,4 +503,4 @@ app.post("/clearChatNotifications", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+app.listen(3000, () => console.log("Server running on port 3000"));

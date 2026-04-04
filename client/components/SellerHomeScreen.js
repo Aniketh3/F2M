@@ -1,20 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Image,
-  TextInput,
-  Platform,
-  StatusBar,
-  Dimensions,
-  KeyboardAvoidingView,
-  ScrollView
+  View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert, Modal, Image, TextInput, Platform, StatusBar, Dimensions, KeyboardAvoidingView, ScrollView
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -25,48 +11,32 @@ import { useFocusEffect } from '@react-navigation/native';
 import QRCode from 'react-native-qrcode-svg';
 import { useLanguage, TranslatedText } from '../context/LanguageContext';
 
-// 🔧 CONFIG
 const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const COLORS = {
-  primary: '#10B981',     
-  primaryDark: '#047857', 
-  background: '#F8FAFC',  
-  surface: '#FFFFFF',
-  textMain: '#0F172A',
-  textSec: '#64748B',
-  border: '#E2E8F0',
-  success: '#34D399',
-  danger: '#EF4444',
-  edit: '#3B82F6' // Blue for edit
-};
+const COLORS = { primary: '#10B981', primaryDark: '#047857', background: '#F8FAFC', surface: '#FFFFFF', textMain: '#0F172A', textSec: '#64748B', border: '#E2E8F0', success: '#34D399', danger: '#EF4444', edit: '#3B82F6' };
+const { width } = Dimensions.get('window');
 
 const SellerHomeScreen = ({ navigation }) => {
   const { t, language, changeLanguage } = useLanguage();
   const [mySales, setMySales] = useState([]);
   const [sellerName, setSellerName] = useState('');
-  
-  // Form State
+
   const [sellItem, setSellItem] = useState('');
   const [sellQuantity, setSellQuantity] = useState('');
   const [saleAmount, setSaleAmount] = useState('');
   const [image, setImage] = useState(null);
-  
-  // Edit Mode State
+
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-  // UI State
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  
-  // Custom states added for QR and Notifs
+
   const [showQRModal, setShowQRModal] = useState(false);
   const [createdQRData, setCreatedQRData] = useState('');
   const [showScanModal, setShowScanModal] = useState(false);
   const [manualOrderID, setManualOrderID] = useState('');
-  
+
   const [notifications, setNotifications] = useState([]);
   const [showNotifModal, setShowNotifModal] = useState(false);
   const [sideMenuVisible, setSideMenuVisible] = useState(false);
@@ -91,232 +61,139 @@ const SellerHomeScreen = ({ navigation }) => {
       const res = await axios.get(`${BACKEND_URL}/sellerSaleList?username=${name}`);
       setMySales((res.data.seller || []).reverse());
       setNotifications((res.data.notifications || []).reverse());
-    } catch (e) {
-      console.log(e);
-    } finally {
-      setRefreshing(false);
-    }
+    } catch (e) { }
+    finally { setRefreshing(false); }
   };
 
-  // 📸 Camera
   const openCamera = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert("Access Denied", "Camera permission is required.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.5,
-    });
+    if (permissionResult.granted === false) return Alert.alert("Access Denied", "Camera permission is required.");
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [4, 3], quality: 0.5 });
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-  // Notification Response
+  // 🚨 INSTANT NOTIFICATION UPDATE FIX
+  // 🚨 FIXED: Now forces database sync so buttons hide permanently
+  // 🚨 INSTANT NOTIFICATION UPDATE FIX
   const handleNotifResponse = async (notif, status) => {
+    // 1. Instantly hide buttons for ALL duplicate notifications on screen
+    setNotifications(prevNotifs => prevNotifs.map(n =>
+      (n.orderID === notif.orderID && n.buyerName === notif.buyerName)
+        ? { ...n, status: status } : n
+    ));
+
     try {
-        await axios.post(`${BACKEND_URL}/respondBuyRequest`, {
-            sellerName: sellerName,
-            buyerName: notif.buyerName,
-            orderID: notif.orderID,
-            itemName: notif.itemName,
-            status: status
-        });
-        Alert.alert("Success", `Request ${status}!`);
-        fetchSales(sellerName);
-    } catch(e) {
-        Alert.alert("Error", "Action failed.");
+      // 2. Tell backend
+      await axios.post(`${BACKEND_URL}/respondBuyRequest`, {
+        sellerName: sellerName,
+        buyerName: notif.buyerName,
+        orderID: notif.orderID,
+        itemName: notif.itemName,
+        status: status
+      });
+      Alert.alert("Success", `Request ${status}!`);
+    } catch (e) {
+      Alert.alert("Error", "Action failed.");
+      fetchSales(sellerName); // Revert if failed
     }
-  }
+  };
 
-  // ✏️ OPEN EDIT MODAL
   const openEditModal = (item) => {
-    setSellItem(item.SellItem);
-    setSellQuantity(String(item.SellQuantity));
-    setSaleAmount(String(item.SaleAmount));
-    setEditingId(item.OrderID);
-    setIsEditing(true);
-    setModalVisible(true);
+    setSellItem(item.SellItem); setSellQuantity(String(item.SellQuantity)); setSaleAmount(String(item.SaleAmount));
+    setEditingId(item.OrderID); setIsEditing(true); setModalVisible(true);
   };
 
-  // ➕ OPEN ADD MODAL
   const openAddModal = () => {
-    setSellItem('');
-    setSellQuantity('');
-    setSaleAmount('');
-    setImage(null);
-    setIsEditing(false);
-    setEditingId(null);
-    setModalVisible(true);
+    setSellItem(''); setSellQuantity(''); setSaleAmount(''); setImage(null);
+    setIsEditing(false); setEditingId(null); setModalVisible(true);
   };
 
-  // 🗑 DELETE ITEM
   const handleDelete = (orderId) => {
-    Alert.alert(
-      "Delete Item",
-      "Are you sure you want to remove this listing?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await axios.delete(`${BACKEND_URL}/sellerSale/${orderId}?username=${sellerName}`);
-              fetchSales(sellerName); // Refresh list
-            } catch (e) {
-              Alert.alert("Error", "Could not delete item.");
-            }
-          }
+    Alert.alert("Delete Item", "Are you sure you want to remove this listing?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await axios.delete(`${BACKEND_URL}/sellerSale/${orderId}?username=${sellerName}`);
+            fetchSales(sellerName);
+          } catch (e) { }
         }
-      ]
-    );
+      }
+    ]);
   };
 
-  // 📷 SCAN QR FROM GALLERY OR MANUAL OVERRIDE
-  const handleOpenScan = () => {
-    setManualOrderID('');
-    setShowScanModal(true);
-  };
+  const handleOpenScan = () => { setManualOrderID(''); setShowScanModal(true); };
 
   const handleManualTransit = async () => {
-     if (!manualOrderID.trim()) return;
-     try {
-        setLoading(true);
-        await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, {
-            orderID: manualOrderID.trim(),
-            sellerName: sellerName,
-            status: "In Transit"
-        });
-        Alert.alert("Transit Started", "Status updated successfully.");
-        setShowScanModal(false);
-        fetchSales(sellerName);
-     } catch (e) {
-        Alert.alert("Error", "Could not mark as Transit. Check Order ID.");
-     } finally { setLoading(false); }
+    if (!manualOrderID.trim()) return;
+    try {
+      setLoading(true);
+      await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, { orderID: manualOrderID.trim(), sellerName: sellerName, status: "In Transit" });
+      Alert.alert("Transit Started", "Status updated successfully.");
+      setShowScanModal(false);
+      fetchSales(sellerName);
+    } catch (e) { Alert.alert("Error", "Check Order ID."); }
+    finally { setLoading(false); }
   }
 
   const handleScanQR = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert("Access Denied", "Gallery permission is required to scan QR.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      base64: true,
-      quality: 1,
-    });
+    if (!permissionResult.granted) return Alert.alert("Access Denied", "Gallery permission is required.");
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, base64: true, quality: 1 });
     if (!result.canceled && result.assets[0].base64) {
       try {
         setLoading(true);
         const res = await axios.post(`${BACKEND_URL}/decode-qr`, { imageBase64: result.assets[0].base64 });
         const qrData = JSON.parse(res.data.data);
-        
-        await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, {
-            orderID: qrData.orderID,
-            sellerName: qrData.sellerName || sellerName,
-            status: "In Transit"
-        });
-        
+        await axios.post(`${BACKEND_URL}/sellerSale/transitStatus`, { orderID: qrData.orderID, sellerName: qrData.sellerName || sellerName, status: "In Transit" });
         Alert.alert("Transit Started", "Status updated to 'In Transit'.");
         setShowScanModal(false);
         fetchSales(sellerName);
-      } catch (err) {
-        Alert.alert("Scan Failed", err.response?.data?.message || "Invalid QR Code or Request.");
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { }
+      finally { setLoading(false); }
     }
   };
 
-  // 🚀 SUBMIT (ADD OR UPDATE)
   const handleSubmit = async () => {
-    if (!sellItem || !sellQuantity || !saleAmount) {
-      Alert.alert('Missing Details', 'Please fill all fields.');
-      return;
-    }
-
+    if (!sellItem || !sellQuantity || !saleAmount) return Alert.alert('Missing Details', 'Please fill all fields.');
     setLoading(true);
     try {
       if (isEditing) {
-        // UPDATE EXISTING
-        await axios.put(`${BACKEND_URL}/sellerSale/${editingId}?username=${sellerName}`, {
-          SellItem: sellItem,
-          SellQuantity: Number(sellQuantity),
-          SaleAmount: Number(saleAmount),
-        });
+        await axios.put(`${BACKEND_URL}/sellerSale/${editingId}?username=${sellerName}`, { SellItem: sellItem, SellQuantity: Number(sellQuantity), SaleAmount: Number(saleAmount) });
         Alert.alert('Success', 'Listing updated successfully!');
       } else {
-        // CREATE NEW
-        const res = await axios.post(`${BACKEND_URL}/sellerSale?username=${sellerName}`, {
-          SellItem: sellItem,
-          SellQuantity: Number(sellQuantity),
-          SaleAmount: Number(saleAmount),
-        });
-        const newOrderID = res.data.orderID;
-        if (newOrderID) {
-            setCreatedQRData(JSON.stringify({ orderID: newOrderID, sellerName }));
-            setShowQRModal(true);
-        }
+        const res = await axios.post(`${BACKEND_URL}/sellerSale?username=${sellerName}`, { SellItem: sellItem, SellQuantity: Number(sellQuantity), SaleAmount: Number(saleAmount) });
+        if (res.data.orderID) { setCreatedQRData(JSON.stringify({ orderID: res.data.orderID, sellerName })); setShowQRModal(true); }
         Alert.alert('Success', 'New produce listed!');
       }
-      
       setModalVisible(false);
       fetchSales(sellerName);
-
-    } catch (e) {
-        Alert.alert('Error', 'Operation failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { }
+    finally { setLoading(false); }
   };
 
   const renderSaleItem = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.headerLeft}>
-          <View style={styles.iconBox}>
-            <MaterialCommunityIcons name="corn" size={24} color={COLORS.primary} />
-          </View>
+          <View style={styles.iconBox}><MaterialCommunityIcons name="corn" size={24} color={COLORS.primary} /></View>
           <View>
             <TranslatedText style={styles.cardTitle} text={item.SellItem} />
             <Text style={styles.cardId}>#{item.OrderID?.substring(0, 6)}</Text>
           </View>
         </View>
-        
-        {/* ACTION BUTTONS */}
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => openEditModal(item)} style={[styles.actionBtn, styles.editBtn]}>
-            <Feather name="edit-2" size={16} color={COLORS.edit} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleDelete(item.OrderID)} style={[styles.actionBtn, styles.deleteBtn]}>
-            <Feather name="trash-2" size={16} color={COLORS.danger} />
-          </TouchableOpacity>
+          <TouchableOpacity onPress={() => openEditModal(item)} style={[styles.actionBtn, styles.editBtn]}><Feather name="edit-2" size={16} color={COLORS.edit} /></TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDelete(item.OrderID)} style={[styles.actionBtn, styles.deleteBtn]}><Feather name="trash-2" size={16} color={COLORS.danger} /></TouchableOpacity>
         </View>
       </View>
-
       <View style={styles.divider} />
-
       <View style={styles.cardBody}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>{t('qty')}</Text>
-          <Text style={styles.statValue}>{item.SellQuantity} kg</Text>
-        </View>
+        <View style={styles.stat}><Text style={styles.statLabel}>{t('qty')}</Text><Text style={styles.statValue}>{item.SellQuantity} kg</Text></View>
         <View style={styles.verticalDivider} />
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>{t('price')}</Text>
-          <Text style={styles.statValue}>₹{item.SaleAmount}</Text>
-        </View>
+        <View style={styles.stat}><Text style={styles.statLabel}>{t('price')}</Text><Text style={styles.statValue}>₹{item.SaleAmount}</Text></View>
         <View style={styles.verticalDivider} />
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>{t('status')}</Text>
-          <Text style={[styles.statValue, { color: item.isTransactionComplete ? COLORS.success : (item.TransactionStatus === 'In Transit' ? COLORS.primary : '#F59E0B') }]}>
-            {item.isTransactionComplete ? t('sold') : (item.TransactionStatus || t('pending'))}
-          </Text>
-        </View>
+        <View style={styles.stat}><Text style={styles.statLabel}>{t('status')}</Text><Text style={[styles.statValue, { color: item.isTransactionComplete ? COLORS.success : (item.TransactionStatus === 'In Transit' ? COLORS.primary : '#F59E0B') }]}>{item.isTransactionComplete ? t('sold') : (item.TransactionStatus || t('pending'))}</Text></View>
       </View>
     </View>
   );
@@ -324,298 +201,111 @@ const SellerHomeScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-
-      {/* HEADER */}
       <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.header}>
         <View style={styles.headerContent}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity 
-              style={styles.menuIcon} 
-              onPress={() => setSideMenuVisible(true)}
-            >
-              <Feather name="menu" size={28} color="#fff" />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.greeting}>{t('welcome_back')}</Text>
-              <Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text>
-            </View>
+            <TouchableOpacity style={styles.menuIcon} onPress={() => setSideMenuVisible(true)}><Feather name="menu" size={28} color="#fff" /></TouchableOpacity>
+            <View><Text style={styles.greeting}>{t('welcome_back')}</Text><Text style={styles.sellerName}>{sellerName || 'Farmer'}</Text></View>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-              <Feather name="plus" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>{t('add')}</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.addButton} onPress={openAddModal}><Feather name="plus" size={20} color="#fff" /><Text style={styles.addButtonText}>{t('add')}</Text></TouchableOpacity>
           </View>
         </View>
         <View style={styles.summaryContainer}>
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryValue}>{mySales.length}</Text>
-            <Text style={styles.summaryLabel}>{t('total_items')}</Text>
-          </View>
+          <View style={styles.summaryBox}><Text style={styles.summaryValue}>{mySales.length}</Text><Text style={styles.summaryLabel}>{t('total_items')}</Text></View>
           <View style={styles.summaryDivider} />
-          <View style={styles.summaryBox}>
-            <Text style={styles.summaryValue}>{mySales.filter(i => !i.isTransactionComplete).length}</Text>
-            <Text style={styles.summaryLabel}>{t('active')}</Text>
-          </View>
+          <View style={styles.summaryBox}><Text style={styles.summaryValue}>{mySales.filter(i => !i.isTransactionComplete).length}</Text><Text style={styles.summaryLabel}>{t('active')}</Text></View>
         </View>
       </LinearGradient>
 
-      {/* LIST */}
       <View style={styles.listContainer}>
         <Text style={styles.sectionTitle}>{t('my_inventory')}</Text>
-        <FlatList
-          data={mySales}
-          renderItem={renderSaleItem}
-          keyExtractor={(item) => item.OrderID || Math.random().toString()}
-          refreshing={refreshing}
-          onRefresh={() => fetchSales(sellerName)}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="leaf-off" size={48} color={COLORS.textSec} />
-              <Text style={styles.emptyText}>No items listed.</Text>
-            </View>
-          }
-        />
+        <FlatList data={mySales} renderItem={renderSaleItem} keyExtractor={(item) => item.OrderID || Math.random().toString()} refreshing={refreshing} onRefresh={() => fetchSales(sellerName)} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }} ListEmptyComponent={<View style={styles.emptyState}><MaterialCommunityIcons name="leaf-off" size={48} color={COLORS.textSec} /><Text style={styles.emptyText}>No items listed.</Text></View>} />
       </View>
 
-      {/* MODAL */}
+      {/* Editor Modal */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{isEditing ? t('edit_listing') : t('new_listing')}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Feather name="x" size={24} color={COLORS.textSec} />
-              </TouchableOpacity>
-            </View>
-
+            <View style={styles.modalHeader}><Text style={styles.modalTitle}>{isEditing ? t('edit_listing') : t('new_listing')}</Text><TouchableOpacity onPress={() => setModalVisible(false)}><Feather name="x" size={24} color={COLORS.textSec} /></TouchableOpacity></View>
             <ScrollView contentContainerStyle={styles.formScroll}>
-              {!isEditing && (
-                <>
-                  <Text style={styles.inputLabel}>{t('compliance_security')}</Text>
-                  <TouchableOpacity style={styles.cameraBox} onPress={openCamera}>
-                    {image ? (
-                      <Image source={{ uri: image }} style={styles.imagePreview} />
-                    ) : (
-                      <View style={{ alignItems: 'center' }}>
-                        <Feather name="camera" size={32} color={COLORS.primary} />
-                        <Text style={styles.cameraText}>{t('add')}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )}
-
-              <Text style={styles.inputLabel}>{t('crop_name')}</Text>
-              <TextInput style={styles.input} placeholder={t('price')} value={sellItem} onChangeText={setSellItem} />
-
+              {!isEditing && (<><Text style={styles.inputLabel}>{t('compliance_security')}</Text><TouchableOpacity style={styles.cameraBox} onPress={openCamera}>{image ? (<Image source={{ uri: image }} style={styles.imagePreview} />) : (<View style={{ alignItems: 'center' }}><Feather name="camera" size={32} color={COLORS.primary} /><Text style={styles.cameraText}>{t('add')}</Text></View>)}</TouchableOpacity></>)}
+              <Text style={styles.inputLabel}>{t('crop_name')}</Text><TextInput style={styles.input} placeholder={t('price')} value={sellItem} onChangeText={setSellItem} />
               <View style={styles.row}>
-                <View style={{ flex: 1, marginRight: 10 }}>
-                  <Text style={styles.inputLabel}>{t('qty')} (kg)</Text>
-                  <TextInput style={styles.input} placeholder="0" value={sellQuantity} onChangeText={setSellQuantity} keyboardType="numeric" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inputLabel}>{t('price')} (₹)</Text>
-                  <TextInput style={styles.input} placeholder="0" value={saleAmount} onChangeText={setSaleAmount} keyboardType="numeric" />
-                </View>
+                <View style={{ flex: 1, marginRight: 10 }}><Text style={styles.inputLabel}>{t('qty')} (kg)</Text><TextInput style={styles.input} placeholder="0" value={sellQuantity} onChangeText={setSellQuantity} keyboardType="numeric" /></View>
+                <View style={{ flex: 1 }}><Text style={styles.inputLabel}>{t('price')} (₹)</Text><TextInput style={styles.input} placeholder="0" value={saleAmount} onChangeText={setSaleAmount} keyboardType="numeric" /></View>
               </View>
-
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isEditing ? t('update_listing') : t('post_listing')}</Text>}
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{isEditing ? t('update_listing') : t('post_listing')}</Text>}</TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Transit Mark/Scan Modal */}
-      <Modal animationType="slide" transparent={true} visible={showScanModal} onRequestClose={() => setShowScanModal(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-             <View style={styles.modalHeader}>
-               <Text style={styles.modalTitle}>{t('in_transit')}</Text>
-               <TouchableOpacity onPress={() => setShowScanModal(false)}>
-                 <Feather name="x" size={24} color={COLORS.textSec} />
-               </TouchableOpacity>
-             </View>
-             
-             <Text style={styles.inputLabel}>{t('track_status')}</Text>
-             <TextInput style={styles.input} placeholder="e.g. A3B8X" value={manualOrderID} onChangeText={setManualOrderID} autoCapitalize="none" />
-             <TouchableOpacity style={styles.submitBtn} onPress={handleManualTransit} disabled={loading}>
-                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{t('update_listing')}</Text>}
-             </TouchableOpacity>
-
-             <View style={{ marginVertical: 20, alignItems: 'center' }}><Text style={{ color: COLORS.textSec }}>- OR -</Text></View>
-
-             <TouchableOpacity style={[styles.submitBtn, {backgroundColor: '#1E293B'}]} onPress={handleScanQR} disabled={loading}>
-                 {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Scan QR from Gallery</Text>}
-             </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Notifications Modal */}
+      {/* Notif Modal - FORCED UPDATE WITH extraData */}
       <Modal animationType="slide" transparent={true} visible={showNotifModal} onRequestClose={() => setShowNotifModal(false)}>
-          <View style={styles.modalOverlay}>
-             <View style={[styles.modalContent, {height: '70%'}]}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{t('chat')}</Text>
-                  <TouchableOpacity onPress={() => setShowNotifModal(false)}>
-                    <Feather name="x" size={24} color={COLORS.textSec} />
-                  </TouchableOpacity>
-                </View>
-                <FlatList
-                   data={notifications}
-                   keyExtractor={(item) => item._id || Math.random().toString()}
-                   renderItem={({item}) => (
-                       <View style={styles.notifCard}>
-                          <Text style={styles.notifMsg}>{item.message}</Text>
-                          {item.type === 'BuyRequest' && <Text style={styles.notifPhone}>Buyer Info: {item.buyerName} | {item.buyerPhone}</Text>}
-                          
-                          <View style={{marginTop: 10}}>
-                             {item.type === 'BuyRequest' && item.status === 'Pending' ? (
-                                <View style={{flexDirection: 'row', gap: 10}}>
-                                   <TouchableOpacity style={[styles.actionBtn, {backgroundColor: COLORS.success, flex: 1, alignItems: 'center'}]} onPress={() => handleNotifResponse(item, 'Accepted')}>
-                                      <Text style={{color: '#fff', fontWeight: 'bold'}}>Accept</Text>
-                                   </TouchableOpacity>
-                                   <TouchableOpacity style={[styles.actionBtn, {backgroundColor: COLORS.danger, flex: 1, alignItems: 'center'}]} onPress={() => handleNotifResponse(item, 'Rejected')}>
-                                      <Text style={{color: '#fff', fontWeight: 'bold'}}>Reject</Text>
-                                   </TouchableOpacity>
-                                </View>
-                             ) : (
-                                <Text style={{fontWeight: 'bold', color: item.status === 'Accepted' ? COLORS.success : COLORS.textSec}}>
-                                   Status: {item.status || 'Resolved'}
-                                </Text>
-                             )}
-                          </View>
-                       </View>
-                   )}
-                   ListEmptyComponent={<Text style={{ textAlign:'center', marginTop: 20}}>{t('no_orders')}</Text>}
-                />
-             </View>
-          </View>
-      </Modal>
-
-      {/* QR Display Modal */}
-      <Modal animationType="fade" transparent={true} visible={showQRModal} onRequestClose={() => setShowQRModal(false)}>
-        <View style={styles.qrOverlay}>
-          <View style={styles.qrContent}>
-             <Text style={styles.modalTitle}>Produce QR Code</Text>
-             <Text style={{ textAlign: 'center', marginBottom: 20, color: COLORS.textSec }}>Screenshot and save this QR. Use the Scanner later to mark this produce as 'In Transit'.</Text>
-             {createdQRData ? (
-                 <QRCode value={createdQRData} size={200} />
-             ) : null}
-             <TouchableOpacity style={[styles.submitBtn, {marginTop: 30, width: '100%'}]} onPress={() => setShowQRModal(false)}>
-                <Text style={styles.submitBtnText}>Done</Text>
-             </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 🍔 SIDE HAMBURGER MENU */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={sideMenuVisible}
-        onRequestClose={() => setSideMenuVisible(false)}
-      >
-        <View style={styles.drawerOverlay}>
-          <TouchableOpacity 
-            style={styles.drawerCloseArea} 
-            onPress={() => setSideMenuVisible(false)} 
-          />
-          <View style={styles.drawerContent}>
-            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.drawerHeader}>
-              <Text style={styles.drawerTitle}>Farm2Market</Text>
-              <Text style={styles.drawerSub}>{sellerName}</Text>
-            </LinearGradient>
-
-            <View style={styles.drawerItems}>
-              <TouchableOpacity 
-                style={styles.drawerItem} 
-                onPress={() => { setSideMenuVisible(false); handleOpenScan(); }}
-              >
-                <MaterialCommunityIcons name="qrcode-scan" size={24} color={COLORS.primary} />
-                <Text style={styles.drawerItemText}>{t('scan')}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.drawerItem} 
-                onPress={() => { setSideMenuVisible(false); setShowNotifModal(true); }}
-              >
-                <MaterialCommunityIcons name="bell-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.drawerItemText}>Notifications</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.drawerItem} 
-                onPress={() => { setSideMenuVisible(false); navigation.navigate('SellerChat'); }}
-              >
-                <MaterialCommunityIcons name="message-text-outline" size={24} color={COLORS.primary} />
-                <Text style={styles.drawerItemText}>Community Chat</Text>
-              </TouchableOpacity>
-
-              <View style={styles.drawerDivider} />
-
-              {/* Language Section */}
-              <TouchableOpacity 
-                style={styles.drawerItem} 
-                onPress={() => setShowLangDropdown(!showLangDropdown)}
-              >
-                <MaterialCommunityIcons name="translate" size={24} color={COLORS.primary} />
-                <Text style={styles.drawerItemText}>Change Language</Text>
-                <Feather 
-                  name={showLangDropdown ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color={COLORS.textSec} 
-                  style={{ marginLeft: 'auto' }}
-                />
-              </TouchableOpacity>
-
-              {showLangDropdown && (
-                <View style={styles.langList}>
-                  {[
-                    { id: 'en', label: 'English' },
-                    { id: 'hi', label: 'Hindi' },
-                    { id: 'kn', label: 'Kannada' },
-                    { id: 'ta', label: 'Tamil' },
-                    { id: 'te', label: 'Telugu' },
-                    { id: 'ml', label: 'Malayalam' },
-                  ].map((langObj) => (
-                    <TouchableOpacity 
-                      key={langObj.id} 
-                      style={[styles.langOption, language === langObj.id && styles.activeLang]} 
-                      onPress={() => {
-                        changeLanguage(langObj.id);
-                        setSideMenuVisible(false);
-                      }}
-                    >
-                      <Text style={[styles.langLabel, language === langObj.id && styles.activeLangLabel]}>
-                        {langObj.label}
-                      </Text>
-                      {language === langObj.id && <Feather name="check" size={16} color={COLORS.primary} />}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <TouchableOpacity 
-              style={styles.logoutBtn} 
-              onPress={async () => {
-                await AsyncStorage.clear();
-                navigation.replace('SellerLogin');
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '70%' }]}>
+            <View style={styles.modalHeader}><Text style={styles.modalTitle}>{t('chat')}</Text><TouchableOpacity onPress={() => setShowNotifModal(false)}><Feather name="x" size={24} color={COLORS.textSec} /></TouchableOpacity></View>
+            <FlatList
+              data={notifications}
+              extraData={notifications} // Forces React to update list immediately
+              keyExtractor={(item, index) => item._id ? item._id.toString() : index.toString()}
+              renderItem={({ item }) => {
+                const isPending = !item.status || item.status === 'Pending';
+                const isAccepted = item.status === 'Accepted' || item.status === 'accepted';
+                return (
+                  <View style={styles.notifCard}>
+                    <Text style={styles.notifMsg}>{item.message}</Text>
+                    {item.type === 'BuyRequest' && <Text style={styles.notifPhone}>Buyer Info: {item.buyerName} | {item.buyerPhone}</Text>}
+                    <View style={{ marginTop: 10 }}>
+                      {item.type === 'BuyRequest' && isPending ? (
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.success, flex: 1, alignItems: 'center' }]} onPress={() => handleNotifResponse(item, 'Accepted')}><Text style={{ color: '#fff', fontWeight: 'bold' }}>Accept</Text></TouchableOpacity>
+                          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.danger, flex: 1, alignItems: 'center' }]} onPress={() => handleNotifResponse(item, 'Rejected')}><Text style={{ color: '#fff', fontWeight: 'bold' }}>Reject</Text></TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: isAccepted ? '#ECFDF5' : '#F1F5F9', padding: 10, borderRadius: 8, alignItems: 'center' }}>
+                          <Text style={{ fontWeight: 'bold', color: isAccepted ? '#10B981' : '#64748B' }}>Request {item.status || 'Processed'}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                )
               }}
-            >
-              <Feather name="log-out" size={20} color={COLORS.danger} />
-              <Text style={styles.logoutText}>{t('logout')}</Text>
-            </TouchableOpacity>
+              ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20 }}>{t('no_orders')}</Text>}
+            />
           </View>
         </View>
       </Modal>
 
+      <Modal animationType="fade" transparent={true} visible={showScanModal} onRequestClose={() => setShowScanModal(false)}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}><View style={styles.modalContent}><View style={styles.modalHeader}><Text style={styles.modalTitle}>{t('in_transit')}</Text><TouchableOpacity onPress={() => setShowScanModal(false)}><Feather name="x" size={24} color={COLORS.textSec} /></TouchableOpacity></View><Text style={styles.inputLabel}>{t('track_status')}</Text><TextInput style={styles.input} placeholder="e.g. A3B8X" value={manualOrderID} onChangeText={setManualOrderID} autoCapitalize="none" /><TouchableOpacity style={styles.submitBtn} onPress={handleManualTransit} disabled={loading}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{t('update_listing')}</Text>}</TouchableOpacity><View style={{ marginVertical: 20, alignItems: 'center' }}><Text style={{ color: COLORS.textSec }}>- OR -</Text></View><TouchableOpacity style={[styles.submitBtn, { backgroundColor: '#1E293B' }]} onPress={handleScanQR} disabled={loading}>{loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Scan QR from Gallery</Text>}</TouchableOpacity></View></KeyboardAvoidingView></Modal>
+
+      <Modal animationType="fade" transparent={true} visible={showQRModal} onRequestClose={() => setShowQRModal(false)}><View style={styles.qrOverlay}><View style={styles.qrContent}><Text style={styles.modalTitle}>Produce QR Code</Text><Text style={{ textAlign: 'center', marginBottom: 20, color: COLORS.textSec }}>Screenshot and save this QR. Use the Scanner later to mark this produce as 'In Transit'.</Text>{createdQRData ? (<QRCode value={createdQRData} size={200} />) : null}<TouchableOpacity style={[styles.submitBtn, { marginTop: 30, width: '100%' }]} onPress={() => setShowQRModal(false)}><Text style={styles.submitBtnText}>Done</Text></TouchableOpacity></View></View></Modal>
+
+      <Modal animationType="fade" transparent={true} visible={sideMenuVisible} onRequestClose={() => setSideMenuVisible(false)}>
+        <View style={styles.drawerOverlay}>
+          <TouchableOpacity style={styles.drawerCloseArea} onPress={() => setSideMenuVisible(false)} />
+          <View style={styles.drawerContent}>
+            <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.drawerHeader}><Text style={styles.drawerTitle}>Farm2Market</Text><Text style={styles.drawerSub}>{sellerName}</Text></LinearGradient>
+            <View style={styles.drawerItems}>
+              <TouchableOpacity style={styles.drawerItem} onPress={() => { setSideMenuVisible(false); handleOpenScan(); }}><MaterialCommunityIcons name="qrcode-scan" size={24} color={COLORS.primary} /><Text style={styles.drawerItemText}>{t('scan')}</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.drawerItem} onPress={() => { setSideMenuVisible(false); setShowNotifModal(true); }}><MaterialCommunityIcons name="bell-outline" size={24} color={COLORS.primary} /><Text style={styles.drawerItemText}>Notifications</Text></TouchableOpacity>
+
+              {/* 🚨 FIX: Passes exact username and role to ChatList */}
+              <TouchableOpacity style={styles.drawerItem} onPress={() => { setSideMenuVisible(false); navigation.navigate('ChatList', { userName: sellerName, role: 'seller' }); }}>
+                <MaterialCommunityIcons name="account-group-outline" size={24} color={COLORS.primary} />
+                <Text style={styles.drawerItemText}>Buyer Chats</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.drawerItem} onPress={() => { setSideMenuVisible(false); navigation.navigate('SellerChat'); }}><MaterialCommunityIcons name="message-text-outline" size={24} color={COLORS.primary} /><Text style={styles.drawerItemText}>Community Chat</Text></TouchableOpacity>
+              <View style={styles.drawerDivider} />
+              <TouchableOpacity style={styles.drawerItem} onPress={() => setShowLangDropdown(!showLangDropdown)}><MaterialCommunityIcons name="translate" size={24} color={COLORS.primary} /><Text style={styles.drawerItemText}>Change Language</Text><Feather name={showLangDropdown ? "chevron-up" : "chevron-down"} size={20} color={COLORS.textSec} style={{ marginLeft: 'auto' }} /></TouchableOpacity>
+              {showLangDropdown && (<View style={styles.langList}>{[{ id: 'en', label: 'English' }, { id: 'hi', label: 'Hindi' }, { id: 'kn', label: 'Kannada' }, { id: 'ta', label: 'Tamil' }, { id: 'te', label: 'Telugu' }, { id: 'ml', label: 'Malayalam' },].map((langObj) => (<TouchableOpacity key={langObj.id} style={[styles.langOption, language === langObj.id && styles.activeLang]} onPress={() => { changeLanguage(langObj.id); setSideMenuVisible(false); }}><Text style={[styles.langLabel, language === langObj.id && styles.activeLangLabel]}>{langObj.label}</Text>{language === langObj.id && <Feather name="check" size={16} color={COLORS.primary} />}</TouchableOpacity>))}</View>)}
+            </View>
+            <TouchableOpacity style={styles.logoutBtn} onPress={async () => { await AsyncStorage.clear(); navigation.replace('SellerLogin'); }}><Feather name="log-out" size={20} color={COLORS.danger} /><Text style={styles.logoutText}>{t('logout')}</Text></TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

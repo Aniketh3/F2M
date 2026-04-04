@@ -9,6 +9,15 @@ const MessageSchema = new mongoose.Schema({
         type: String,
         required: false
     },
+    recipient: {
+        type: String,
+        default: null
+    },
+    chatType: {
+        type: String,
+        enum: ['community', 'private'],
+        default: 'community'
+    },
     imageUrl: {
         type: String,
         required: false
