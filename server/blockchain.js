@@ -341,6 +341,173 @@ function etherToWei(ether) {
 }
 
 // ============================================================================
+// USER WALLET OPERATIONS (Approach 3)
+// ============================================================================
+
+/**
+ * Fund a user wallet with test ETH from backend wallet
+ * @param {string} toAddress - Recipient wallet address
+ * @param {string} amountEther - Amount in ether (default: "1.0")
+ * @returns {Promise<{txHash, amount}>}
+ */
+async function fundUserWallet(toAddress, amountEther = "1.0") {
+  try {
+    if (!ethers.isAddress(toAddress)) {
+      throw new Error('Invalid recipient address');
+    }
+
+    const amountWei = ethers.parseEther(amountEther);
+    
+    console.log(`Funding wallet ${toAddress} with ${amountEther} ETH from backend...`);
+
+    // Create transaction
+    const tx = await backendWallet.sendTransaction({
+      to: toAddress,
+      value: amountWei
+    });
+
+    // Wait for confirmation
+    const receipt = await tx.wait();
+
+    console.log(`✓ Wallet funded! TxHash: ${receipt.hash}`);
+
+    return {
+      txHash: receipt.hash,
+      amount: amountEther,
+      from: backendWallet.address,
+      to: toAddress,
+      blockNumber: receipt.blockNumber
+    };
+  } catch (error) {
+    console.error('Error funding wallet:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get balance of a specific wallet
+ * @param {string} walletAddress - Address to check
+ * @returns {Promise<{balanceWei, balanceEther}>}
+ */
+async function getWalletBalance(walletAddress) {
+  try {
+    if (!ethers.isAddress(walletAddress)) {
+      throw new Error('Invalid wallet address');
+    }
+
+    const balanceWei = await provider.getBalance(walletAddress);
+    const balanceEther = ethers.formatEther(balanceWei);
+
+    return {
+      address: walletAddress,
+      balanceWei: balanceWei.toString(),
+      balanceEther: balanceEther
+    };
+  } catch (error) {
+    console.error('Error getting wallet balance:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Load user wallet from encrypted private key and get contract instances
+ * @param {string} encryptedPrivateKey - Encrypted private key from DB
+ * @returns {Promise<{wallet, factoryContractWithUser, escrowFunction}>}
+ */
+function loadUserWalletContext(encryptedPrivateKey) {
+  try {
+    const walletUtils = require('./utils/walletUtils');
+    const userWallet = walletUtils.loadUserWallet(encryptedPrivateKey, provider);
+
+    // Create factory contract instance using user's wallet
+    let userFactoryContract = null;
+    if (FACTORY_ADDRESS && factoryABI) {
+      userFactoryContract = new ethers.Contract(FACTORY_ADDRESS, factoryABI, userWallet);
+    }
+
+    return {
+      userWallet,
+      userFactoryContract,
+      userProvider: provider
+    };
+  } catch (error) {
+    console.error('Error loading user wallet context:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Create escrow using user's wallet instead of backend wallet
+ * @param {string} encryptedPrivateKey - User's encrypted private key
+ * @param {string} farmerAddress - Farmer address
+ * @param {string} totalPrice - Total price in wei
+ * @param {number} quantity - Quantity
+ * @param {string} produceType - Type of produce
+ * @param {number} deliveryDeadline - Deadline timestamp
+ * @param {number} penaltyPercent - Penalty percentage
+ * @returns {Promise<{escrowAddress, txHash, status}>}
+ */
+async function createEscrowWithUserWallet(
+  encryptedPrivateKey,
+  farmerAddress,
+  totalPrice,
+  quantity,
+  produceType,
+  deliveryDeadline,
+  penaltyPercent
+) {
+  try {
+    const { userFactoryContract } = loadUserWalletContext(encryptedPrivateKey);
+
+    if (!userFactoryContract) {
+      throw new Error('Factory contract not initialized. Deploy contracts first.');
+    }
+
+    console.log('Creating escrow with user wallet...');
+
+    // Call factory function with user's wallet
+    const tx = await userFactoryContract.createEscrow(
+      farmerAddress,
+      totalPrice,
+      quantity,
+      produceType,
+      deliveryDeadline,
+      penaltyPercent
+    );
+
+    const receipt = await tx.wait();
+
+    // Extract escrow address from logs
+    const escrowCreatedEvent = receipt.logs
+      .map(log => {
+        try {
+          return userFactoryContract.interface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .find(event => event && event.name === 'EscrowCreated');
+
+    if (!escrowCreatedEvent) {
+      throw new Error('Could not find EscrowCreated event');
+    }
+
+    const escrowAddress = escrowCreatedEvent.args[0];
+
+    return {
+      escrowAddress,
+      txHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
+      status: 'Created',
+      createdBy: 'userWallet'
+    };
+  } catch (error) {
+    console.error('Error creating escrow with user wallet:', error.message);
+    throw error;
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -359,6 +526,12 @@ module.exports = {
   rejectDelivery,
   getEscrowStatus,
   getEscrowContract,
+  
+  // User wallet operations (Approach 3)
+  fundUserWallet,
+  getWalletBalance,
+  loadUserWalletContext,
+  createEscrowWithUserWallet,
   
   // Utility functions
   getBackendBalance,

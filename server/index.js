@@ -9,6 +9,8 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const escrowRoutes = require('./routes/escrow');
 const crypto = require('crypto');
+const walletUtils = require('./utils/walletUtils');
+const blockchain = require('./blockchain');
 
 const SECRET_KEY = 'Farm2Market'; 
 
@@ -105,7 +107,106 @@ app.put('/profile/update', verifyToken, async (req, res) => {
 });
 
 // ==========================================
-// 📦 MARKET & SALES ROUTES (Fixes 404)
+// � WALLET ROUTES (Approach 3 - User Wallets)
+// ==========================================
+
+/**
+ * GET /wallet/info/:username
+ * Get wallet information for a user (seller or buyer)
+ */
+app.get('/wallet/info/:username', async (req, res) => {
+    try {
+        const username = req.params.username;
+        
+        // Check if seller
+        let user = await Seller.findOne({ Name: username });
+        let userType = 'seller';
+        
+        // If not seller, check buyer
+        if (!user) {
+            user = await Buyer.findOne({ Name: username });
+            userType = 'buyer';
+        }
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        // If no wallet, return error
+        if (!user.walletAddress) {
+            return res.status(400).json({ message: "User does not have a blockchain wallet yet" });
+        }
+        
+        try {
+            // Get wallet balance
+            const balanceInfo = await blockchain.getWalletBalance(user.walletAddress);
+            
+            res.status(200).json({
+                success: true,
+                userType,
+                username,
+                walletAddress: user.walletAddress,
+                walletCreatedAt: user.walletCreatedAt,
+                balance: {
+                    ether: balanceInfo.balanceEther,
+                    wei: balanceInfo.balanceWei
+                }
+            });
+        } catch (blockchainError) {
+            // Return wallet address even if blockchain check fails
+            res.status(200).json({
+                success: true,
+                userType,
+                username,
+                walletAddress: user.walletAddress,
+                walletCreatedAt: user.walletCreatedAt,
+                balance: null,
+                warning: "Could not fetch balance (Hardhat node may not be running)"
+            });
+        }
+        
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching wallet info", error: err.message });
+    }
+});
+
+/**
+ * POST /wallet/fund/:username
+ * Manually fund a user's wallet (for testing/admin purposes)
+ */
+app.post('/wallet/fund/:username', async (req, res) => {
+    try {
+        const username = req.params.username;
+        const { amountEther = "1.0" } = req.body;
+        
+        // Find user
+        let user = await Seller.findOne({ Name: username });
+        if (!user) user = await Buyer.findOne({ Name: username });
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        if (!user.walletAddress) {
+            return res.status(400).json({ message: "User does not have a wallet" });
+        }
+        
+        // Fund the wallet from backend
+        const fundResult = await blockchain.fundUserWallet(user.walletAddress, amountEther);
+        
+        res.status(200).json({
+            success: true,
+            message: `Wallet funded with ${amountEther} ETH`,
+            transaction: fundResult
+        });
+        
+    } catch (err) {
+        res.status(500).json({ message: "Error funding wallet", error: err.message });
+    }
+});
+
+// ==========================================
+// �📦 MARKET & SALES ROUTES (Fixes 404)
 // ==========================================
 
 // 1. GET Seller's Sales (Fixed Missing Route)
@@ -249,9 +350,59 @@ app.put("/sellerSale/:orderId", async (req, res) => {
 
 app.post("/seller/register", async (req, res) => {
     const { Name, AadharNumber } = req.body;
-    if (await Seller.findOne({ Name, AadharNumber })) return res.status(500).json({ message: "User exists" });
-    await new Seller(req.body).save();
-    res.status(200).json({ message: "Registered" });
+    try {
+        // Check if seller already exists
+        if (await Seller.findOne({ Name, AadharNumber })) {
+            return res.status(500).json({ message: "User exists" });
+        }
+
+        // ============================================================================
+        // WALLET GENERATION (Approach 3)
+        // ============================================================================
+        
+        console.log(`📝 Registering seller: ${Name}`);
+        
+        // Generate wallet for farmer
+        const { address: walletAddress, privateKey } = walletUtils.generateUserWallet();
+        console.log(`✓ Wallet generated: ${walletAddress}`);
+        
+        // Encrypt private key before storing
+        const encryptedPrivateKey = walletUtils.encryptPrivateKey(privateKey);
+        console.log(`✓ Private key encrypted`);
+        
+        // Fund the wallet with test ETH from backend
+        try {
+            const fundResult = await blockchain.fundUserWallet(walletAddress, "1.0");
+            console.log(`✓ Wallet funded with 1.0 ETH. TxHash: ${fundResult.txHash}`);
+        } catch (fundError) {
+            console.warn(`⚠️  Warning: Could not fund wallet (make sure Hardhat node is running). Error: ${fundError.message}`);
+            // Don't fail registration if funding fails - they can fund later
+        }
+        
+        // Create seller document with wallet info
+        const sellerData = {
+            ...req.body,
+            walletAddress,
+            encryptedPrivateKey,
+            walletCreatedAt: new Date()
+        };
+        
+        const newSeller = new Seller(sellerData);
+        await newSeller.save();
+        
+        res.status(200).json({
+            message: "Registered successfully with blockchain wallet",
+            walletAddress,
+            seller: {
+                name: Name,
+                walletCreated: true
+            }
+        });
+        
+    } catch (err) {
+        console.error("Registration error:", err.message);
+        res.status(500).json({ message: "Registration failed", error: err.message });
+    }
 });
 
 app.post("/buyer/login", async (req, res) => {
@@ -264,9 +415,59 @@ app.post("/buyer/login", async (req, res) => {
 
 app.post("/buyer/register", async (req, res) => {
     const { Name, AadharNumber } = req.body;
-    if (await Buyer.findOne({ Name, AadharNumber })) return res.status(500).json({ message: "User exists" });
-    await new Buyer(req.body).save();
-    res.status(200).json({ message: "Registered" });
+    try {
+        // Check if buyer already exists
+        if (await Buyer.findOne({ Name, AadharNumber })) {
+            return res.status(500).json({ message: "User exists" });
+        }
+
+        // ============================================================================
+        // WALLET GENERATION (Approach 3)
+        // ============================================================================
+        
+        console.log(`📝 Registering buyer: ${Name}`);
+        
+        // Generate wallet for buyer
+        const { address: walletAddress, privateKey } = walletUtils.generateUserWallet();
+        console.log(`✓ Wallet generated: ${walletAddress}`);
+        
+        // Encrypt private key before storing
+        const encryptedPrivateKey = walletUtils.encryptPrivateKey(privateKey);
+        console.log(`✓ Private key encrypted`);
+        
+        // Fund the wallet with test ETH from backend
+        try {
+            const fundResult = await blockchain.fundUserWallet(walletAddress, "1.0");
+            console.log(`✓ Wallet funded with 1.0 ETH. TxHash: ${fundResult.txHash}`);
+        } catch (fundError) {
+            console.warn(`⚠️  Warning: Could not fund wallet (make sure Hardhat node is running). Error: ${fundError.message}`);
+            // Don't fail registration if funding fails
+        }
+        
+        // Create buyer document with wallet info
+        const buyerData = {
+            ...req.body,
+            walletAddress,
+            encryptedPrivateKey,
+            walletCreatedAt: new Date()
+        };
+        
+        const newBuyer = new Buyer(buyerData);
+        await newBuyer.save();
+        
+        res.status(200).json({
+            message: "Registered successfully with blockchain wallet",
+            walletAddress,
+            buyer: {
+                name: Name,
+                walletCreated: true
+            }
+        });
+        
+    } catch (err) {
+        console.error("Registration error:", err.message);
+        res.status(500).json({ message: "Registration failed", error: err.message });
+    }
 });
 
 app.post("/sellerSale/transitStatus", async (req, res) => {
@@ -425,4 +626,4 @@ app.post("/clearChatNotifications", async (req, res) => {
     }
 });
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+app.listen(3000, () => console.log("Server running on port 3000"));

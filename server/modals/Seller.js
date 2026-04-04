@@ -101,6 +101,22 @@ const sellerSchema = new mongoose.Schema({
     Notifications:{
         type:[notificationSchema],
         default:[]
+    },
+    // ============================================================================
+    // BLOCKCHAIN WALLET FIELDS (Approach 3 - Hybrid)
+    // ============================================================================
+    walletAddress:{
+        type:String,
+        unique:true,
+        sparse:true  // Allow null for non-blockchain users
+    },
+    encryptedPrivateKey:{
+        type:String,
+        sparse:true  // Encrypted private key for signing transactions
+    },
+    walletCreatedAt:{
+        type:Date,
+        default:null
     }
 
 })
