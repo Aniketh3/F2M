@@ -382,11 +382,20 @@ app.get("/messages", async (req, res) => {
 
 // 2. POST Message
 app.post("/messages", async (req, res) => {
-    const { sender, content, role } = req.body;
-    if (!sender || !content) return res.status(400).json({ message: "Missing sender or content" });
+    const { sender, content, role, imageUrl, audioUrl, location } = req.body;
+    if (!sender || (!content && !imageUrl && !audioUrl && !location)) {
+        return res.status(400).json({ message: "Missing sender or message content" });
+    }
 
     try {
-        const newMessage = new Message({ sender, content, role: role || 'seller' });
+        const newMessage = new Message({ 
+            sender, 
+            content, 
+            role: role || 'seller',
+            imageUrl,
+            audioUrl,
+            location
+        });
         await newMessage.save();
 
         // 🔔 Notify all other sellers
@@ -408,6 +417,17 @@ app.post("/messages", async (req, res) => {
         res.status(201).json(newMessage);
     } catch (err) {
         res.status(500).json({ message: "Error saving message" });
+    }
+});
+
+// 3. DELETE Message
+app.delete("/messages/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        await Message.findByIdAndDelete(id);
+        res.status(200).json({ success: true, message: "Message deleted" });
+    } catch (err) {
+        res.status(500).json({ message: "Error deleting message" });
     }
 });
 
