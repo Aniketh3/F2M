@@ -1,0 +1,14 @@
+Terminal 1: cd fyp-sc && npx hardhat node
+           (Wait for "Started HTTP and WebSocket JSON-RPC server")
+
+Terminal 2: cd fyp-sc && npx hardhat run scripts/deploy.js
+           (Save factory address output)
+
+Terminal 3: cd server && npm start
+           (Wait for "Connected to Mongo DB")
+
+Terminal 4: cd blockchain-server && mvn spring-boot:run
+           (Wait for "Application started")
+
+Terminal 5: cd client && npm start
+           (App ready at localhost:19006)
