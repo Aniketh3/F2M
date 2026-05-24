@@ -35,6 +35,16 @@ const BuyerHomeScreen = () => {
   const [aiPrediction, setAiPrediction] = useState(null);
   const [loadingPrediction, setLoadingPrediction] = useState(false);
 
+  // Blockchain state
+  const [blockchainReady, setBlockchainReady] = useState(false);
+  const [escrowModalVisible, setEscrowModalVisible] = useState(false);
+  const [escrowItem, setEscrowItem] = useState(null);
+  const [escrowQty, setEscrowQty] = useState('');
+  const [escrowPrice, setEscrowPrice] = useState('');
+  const [escrowDeadline, setEscrowDeadline] = useState('7');
+  const [escrowPenalty, setEscrowPenalty] = useState('10');
+  const [creatingEscrow, setCreatingEscrow] = useState(false);
+
   const backend = process.env.EXPO_PUBLIC_API_URL;
 
   const fetchMarket = async (bName = buyerName) => {
@@ -65,7 +75,21 @@ const BuyerHomeScreen = () => {
         fetchMarket(parsed.Name);
       } else { fetchMarket(); }
     });
+    checkBlockchainStatus();
   }, []);
+
+  const checkBlockchainStatus = async () => {
+    try {
+      const res = await axios.get(`${backend}/escrow/status`);
+      if (res.data.factoryAddress) {
+        setBlockchainReady(true);
+      } else {
+        setBlockchainReady(false);
+      }
+    } catch (e) {
+      setBlockchainReady(false);
+    }
+  };
 
   const groupDataByProduce = (data, searchQuery = '') => {
     const groups = {};
@@ -75,7 +99,7 @@ const BuyerHomeScreen = () => {
           if (searchQuery && !item.SellItem.toLowerCase().includes(searchQuery.toLowerCase())) return;
           const itemName = item.SellItem.trim();
           if (!groups[itemName]) groups[itemName] = { name: itemName, totalQty: 0, minPrice: Infinity, maxPrice: 0, sellers: [] };
-          groups[itemName].sellers.push({ ...item, sellerName: seller.Name, sellerPhone: seller.PhoneNumber });
+          groups[itemName].sellers.push({ ...item, sellerName: seller.Name, sellerPhone: seller.PhoneNumber, sellerWallet: seller.WalletAddress });
           groups[itemName].totalQty += item.SellQuantity;
           groups[itemName].minPrice = Math.min(groups[itemName].minPrice, item.SaleAmount);
           groups[itemName].maxPrice = Math.max(groups[itemName].maxPrice, item.SaleAmount);
@@ -91,7 +115,7 @@ const BuyerHomeScreen = () => {
     setLoadingPrediction(true); setAiPrediction(null);
     const dateStr = new Date().toISOString().split('T')[0];
     try {
-      const res = await axios.post('https://farm2market-ai-predictor.onrender.com/predict-price', { produce: 'Vegetables', variety: variety, date: dateStr });
+      const res = await axios.post('http://localhost:5000/predict-price', { produce: 'Vegetables', variety: variety, date: dateStr });
       setAiPrediction(res.data);
     } catch (e) { setAiPrediction({ error: 'Prediction data unavailable for this crop.' }); }
     finally { setLoadingPrediction(false); }
@@ -100,10 +124,76 @@ const BuyerHomeScreen = () => {
   const openProduceDetails = (item) => { setSelectedProduce(item); setProduceSellers(item.sellers.sort((a, b) => a.SaleAmount - b.SaleAmount)); fetchPrediction(item.name); };
 
   const handleBuy = async (item) => {
+    if (!blockchainReady) {
+      return handleDirectBuy(item);
+    }
+    
+    Alert.alert(
+      "Purchase Produce",
+      "Choose your transaction type:",
+      [
+        {
+          text: "💵 Direct Trade (Cash)",
+          onPress: () => handleDirectBuy(item)
+        },
+        {
+          text: "🔒 Blockchain Escrow",
+          onPress: () => handleEscrowBuyPrompt(item)
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+
+  const handleDirectBuy = async (item) => {
     try {
       await axios.post(`${backend}/buyProduce`, { sellerName: item.sellerName, buyerName: buyerName, buyerPhone: "Registered Phone", orderID: item.OrderID, itemName: item.SellItem });
       Alert.alert(t('success'), `Request sent to ${item.sellerName}! They have been notified.`);
     } catch (err) { Alert.alert(t('error'), "Could not send buy request."); }
+  };
+
+  const handleEscrowBuyPrompt = (item) => {
+    setSelectedProduce(null);
+    setEscrowItem(item);
+    setEscrowQty(String(item.SellQuantity));
+    // Auto-calculate equivalent ETH based on mock rate 1 ETH = ₹2000
+    const estEth = (item.SaleAmount / 2000).toFixed(4);
+    setEscrowPrice(String(estEth));
+    setEscrowDeadline('7');
+    setEscrowPenalty('10');
+    setEscrowModalVisible(true);
+  };
+
+  const submitEscrow = async () => {
+    if (!escrowQty || !escrowPrice || !escrowDeadline || !escrowPenalty) {
+      Alert.alert("Error", "Please fill all fields");
+      return;
+    }
+    setCreatingEscrow(true);
+    try {
+      const farmerAddress = escrowItem.sellerWallet || '0x70997970C51812e339D9B73b0245ad59cc793a05'; // fallback to dummy
+      await axios.post(`${backend}/escrow/create`, {
+        farmerAddress,
+        quantity: parseInt(escrowQty),
+        produceType: escrowItem.SellItem,
+        priceInEther: parseFloat(escrowPrice),
+        deliveryDeadlineDays: parseInt(escrowDeadline),
+        penaltyPercent: parseInt(escrowPenalty),
+        orderID: escrowItem.OrderID,
+        buyerName: buyerName
+      });
+      
+      Alert.alert("Success", `Escrow Contract Deployed successfully!`);
+      setEscrowModalVisible(false);
+      fetchMarket();
+    } catch (e) {
+      Alert.alert("Escrow Creation Failed", e.response?.data?.error || e.message);
+    } finally {
+      setCreatingEscrow(false);
+    }
   };
 
   const getProduceIcon = (name) => {
@@ -175,7 +265,26 @@ const BuyerHomeScreen = () => {
       </Modal>
 
       <LinearGradient colors={[COLORS.primary, COLORS.primaryDark]} style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}><TouchableOpacity style={styles.menuIcon} onPress={() => setSideMenuVisible(true)}><Feather name="menu" size={28} color="#fff" /></TouchableOpacity><View><Text style={styles.welcomeText}>{t('fresh_market')}</Text><Text style={styles.subWelcome}>{t('source_direct')}</Text></View></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+          <TouchableOpacity style={styles.menuIcon} onPress={() => setSideMenuVisible(true)}>
+            <Feather name="menu" size={28} color="#fff" />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.welcomeText}>{t('fresh_market')}</Text>
+            <Text style={styles.subWelcome}>{t('source_direct')}</Text>
+          </View>
+          {blockchainReady ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, marginLeft: 'auto' }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#34D399', marginRight: 6 }} />
+              <Text style={{ fontSize: 11, color: '#fff', fontWeight: 'bold' }}>Escrow Ready</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, marginLeft: 'auto' }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6 }} />
+              <Text style={{ fontSize: 11, color: '#FECACA', fontWeight: 'bold' }}>Offline</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.searchContainer}><Feather name="search" size={20} color={COLORS.textSec} /><TextInput style={styles.searchInput} placeholder={t('search')} value={search} onChangeText={handleSearch} placeholderTextColor="#94A3B8" /></View>
       </LinearGradient>
 
@@ -185,6 +294,42 @@ const BuyerHomeScreen = () => {
           <FlatList data={groupedItems} renderItem={renderProduceCard} keyExtractor={item => item.name} numColumns={2} columnWrapperStyle={styles.columnWrapper} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} ListEmptyComponent={<View style={styles.emptyState}><MaterialCommunityIcons name="basket-off-outline" size={48} color={COLORS.textSec} /><Text style={styles.emptyText}>No produce available right now.</Text></View>} />
         )}
       </View>
+
+      {/* Escrow Creation Modal */}
+      <Modal animationType="slide" transparent={true} visible={escrowModalVisible} onRequestClose={() => setEscrowModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { height: '75%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Blockchain Escrow</Text>
+                <Text style={styles.modalSub}>{escrowItem?.SellItem} ({escrowItem?.sellerName})</Text>
+              </View>
+              <TouchableOpacity onPress={() => setEscrowModalVisible(false)} style={styles.closeBtn}>
+                <Feather name="x" size={24} color={COLORS.textMain} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+              <Text style={styles.listLabel}>Set Escrow Parameters</Text>
+              
+              <Text style={styles.inputLabel}>Quantity (kg)</Text>
+              <TextInput style={styles.escrowInput} value={escrowQty} onChangeText={setEscrowQty} keyboardType="numeric" placeholderTextColor="#aaa" />
+
+              <Text style={styles.inputLabel}>Price in Ether (ETH)</Text>
+              <TextInput style={styles.escrowInput} value={escrowPrice} onChangeText={setEscrowPrice} keyboardType="decimal-pad" placeholderTextColor="#aaa" />
+
+              <Text style={styles.inputLabel}>Delivery Deadline (Days)</Text>
+              <TextInput style={styles.escrowInput} value={escrowDeadline} onChangeText={setEscrowDeadline} keyboardType="numeric" placeholderTextColor="#aaa" />
+
+              <Text style={styles.inputLabel}>Late Penalty Percent (%)</Text>
+              <TextInput style={styles.escrowInput} value={escrowPenalty} onChangeText={setEscrowPenalty} keyboardType="numeric" placeholderTextColor="#aaa" />
+
+              <TouchableOpacity style={[styles.submitBtn, creatingEscrow && { opacity: 0.6 }]} onPress={submitEscrow} disabled={creatingEscrow}>
+                {creatingEscrow ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Deploy Escrow Agreement</Text>}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal animationType="slide" transparent={true} visible={!!selectedProduce} onRequestClose={() => setSelectedProduce(null)}>
         <View style={styles.modalOverlay}>
@@ -302,7 +447,11 @@ const styles = StyleSheet.create({
   langLabel: { fontSize: 15, color: COLORS.textMain },
   activeLangLabel: { color: COLORS.primaryDark, fontWeight: 'bold' },
   logoutBtn: { position: 'absolute', bottom: 40, left: 20, right: 20, flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 12, borderWeight: 1, borderColor: '#FEE2E2', backgroundColor: '#FEF2F2' },
-  logoutText: { marginLeft: 10, color: COLORS.error, fontWeight: 'bold', fontSize: 16 }
+  logoutText: { marginLeft: 10, color: COLORS.error, fontWeight: 'bold', fontSize: 16 },
+  escrowInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingHorizontal: 14, height: 50, marginBottom: 16, fontSize: 16, color: COLORS.textMain },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textMain, marginBottom: 8 },
+  submitBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5 },
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
 });
 
 export default BuyerHomeScreen;

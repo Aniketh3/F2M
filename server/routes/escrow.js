@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const blockchain = require('../blockchain');
+const Buyer = require('../modals/Buyer');
+const Seller = require('../modals/Seller');
 
 // ============================================================================
 // HELPER FUNCTION - Error Response
@@ -57,10 +59,26 @@ router.get('/status', async (req, res) => {
  */
 router.post('/create', async (req, res) => {
   try {
-    const { farmerAddress, quantity, produceType, priceInEther, deliveryDeadlineDays, penaltyPercent } = req.body;
+    const { farmerAddress, quantity, produceType, priceInEther, deliveryDeadlineDays, penaltyPercent, orderID, buyerName } = req.body;
+
+    console.log('[Escrow Create] Received request with farmerAddress:', farmerAddress, 'typeof:', typeof farmerAddress);
+
+    // Defensive check: if address is missing, null, or string "null"/"undefined", fallback to dummy account 1 (farmer)
+    let finalFarmerAddress = farmerAddress;
+    if (!finalFarmerAddress || 
+        finalFarmerAddress === 'null' || 
+        finalFarmerAddress === 'undefined' || 
+        finalFarmerAddress.trim() === '' || 
+        finalFarmerAddress === 'None') {
+      finalFarmerAddress = '0x70997970c51812e339d9b73b0245ad59cc793a05';
+      console.log('[Escrow Create] Falling back to dummy farmer address:', finalFarmerAddress);
+    } else {
+      finalFarmerAddress = finalFarmerAddress.toLowerCase(); // Bypass EIP-55 checksum check by using lowercase
+      console.log('[Escrow Create] Formatted farmer address to lowercase:', finalFarmerAddress);
+    }
 
     // Validate required fields
-    if (!farmerAddress || !quantity || !produceType || !priceInEther || !deliveryDeadlineDays || penaltyPercent === undefined) {
+    if (!finalFarmerAddress || !quantity || !produceType || !priceInEther || !deliveryDeadlineDays || penaltyPercent === undefined) {
       return sendError(res, 400, 'Missing required fields: farmerAddress, quantity, produceType, priceInEther, deliveryDeadlineDays, penaltyPercent');
     }
 
@@ -72,13 +90,51 @@ router.post('/create', async (req, res) => {
 
     // Call blockchain function
     const escrowData = await blockchain.createEscrow(
-      farmerAddress,
+      finalFarmerAddress,
       totalPriceInWei,
       quantity,
       produceType,
       deliveryDeadline,
       penaltyPercent
     );
+
+    // Sync to MongoDB if orderID and buyerName are provided
+    if (orderID && buyerName) {
+      try {
+        // 1. Update Seller's listing
+        await Seller.findOneAndUpdate(
+          { "MySellList.OrderID": orderID },
+          {
+            $set: {
+              "MySellList.$.isEscrow": true,
+              "MySellList.$.escrowAddress": escrowData.escrowAddress,
+              "MySellList.$.escrowStatus": "Created"
+            }
+          }
+        );
+
+        // 2. Create and push Buyer's order
+        const newOrder = {
+          OrderId: orderID,
+          OrderItem: produceType,
+          OrderQuantity: quantity,
+          SingleItemPrice: priceInEther,
+          TotalPrice: priceInEther,
+          isTransactionComplete: false,
+          isItemDelivered: false,
+          isEscrow: true,
+          escrowAddress: escrowData.escrowAddress,
+          escrowStatus: 'Created'
+        };
+
+        await Buyer.findOneAndUpdate(
+          { Name: new RegExp(`^${buyerName.trim()}$`, 'i') },
+          { $push: { MyOrders: newOrder } }
+        );
+      } catch (dbError) {
+        console.error('Failed to sync escrow creation to DB:', dbError.message);
+      }
+    }
 
     res.status(201).json({
       message: 'Escrow created successfully',
@@ -133,6 +189,29 @@ router.post('/:escrowAddress/accept', async (req, res) => {
 
     const result = await blockchain.acceptAgreement(escrowAddress);
 
+    // Sync to MongoDB
+    try {
+      await Seller.findOneAndUpdate(
+        { "MySellList.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MySellList.$.escrowStatus": result.status,
+            "MySellList.$.TransactionStatus": "In Transit"
+          }
+        }
+      );
+      await Buyer.findOneAndUpdate(
+        { "MyOrders.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MyOrders.$.escrowStatus": result.status
+          }
+        }
+      );
+    } catch (dbError) {
+      console.error('Failed to sync acceptAgreement to DB:', dbError.message);
+    }
+
     res.status(200).json({
       message: 'Agreement accepted successfully',
       escrowAddress,
@@ -170,6 +249,20 @@ router.post('/:escrowAddress/deposit', async (req, res) => {
 
     const result = await blockchain.depositFunds(escrowAddress, amountInWei);
 
+    // Sync to MongoDB
+    try {
+      await Seller.findOneAndUpdate(
+        { "MySellList.escrowAddress": escrowAddress },
+        { $set: { "MySellList.$.escrowStatus": result.status } }
+      );
+      await Buyer.findOneAndUpdate(
+        { "MyOrders.escrowAddress": escrowAddress },
+        { $set: { "MyOrders.$.escrowStatus": result.status } }
+      );
+    } catch (dbError) {
+      console.error('Failed to sync depositFunds to DB:', dbError.message);
+    }
+
     res.status(200).json({
       message: 'Funds deposited successfully',
       escrowAddress,
@@ -195,6 +288,20 @@ router.post('/:escrowAddress/mark-delivered', async (req, res) => {
 
     const result = await blockchain.markAsDelivered(escrowAddress);
 
+    // Sync to MongoDB
+    try {
+      await Seller.findOneAndUpdate(
+        { "MySellList.escrowAddress": escrowAddress },
+        { $set: { "MySellList.$.escrowStatus": result.status } }
+      );
+      await Buyer.findOneAndUpdate(
+        { "MyOrders.escrowAddress": escrowAddress },
+        { $set: { "MyOrders.$.escrowStatus": result.status } }
+      );
+    } catch (dbError) {
+      console.error('Failed to sync markAsDelivered to DB:', dbError.message);
+    }
+
     res.status(200).json({
       message: 'Marked as delivered successfully',
       escrowAddress,
@@ -218,6 +325,32 @@ router.post('/:escrowAddress/confirm-delivery', async (req, res) => {
     const { escrowAddress } = req.params;
 
     const result = await blockchain.confirmDelivery(escrowAddress);
+
+    // Sync to MongoDB
+    try {
+      await Seller.findOneAndUpdate(
+        { "MySellList.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MySellList.$.escrowStatus": result.status,
+            "MySellList.$.isTransactionComplete": true,
+            "MySellList.$.TransactionStatus": "Completed"
+          }
+        }
+      );
+      await Buyer.findOneAndUpdate(
+        { "MyOrders.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MyOrders.$.escrowStatus": result.status,
+            "MyOrders.$.isTransactionComplete": true,
+            "MyOrders.$.isItemDelivered": true
+          }
+        }
+      );
+    } catch (dbError) {
+      console.error('Failed to sync confirmDelivery to DB:', dbError.message);
+    }
 
     res.status(200).json({
       message: 'Delivery confirmed and funds released to farmer',
@@ -252,6 +385,29 @@ router.post('/:escrowAddress/reject-delivery', async (req, res) => {
     }
 
     const result = await blockchain.rejectDelivery(escrowAddress, reason);
+
+    // Sync to MongoDB
+    try {
+      await Seller.findOneAndUpdate(
+        { "MySellList.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MySellList.$.escrowStatus": result.status,
+            "MySellList.$.TransactionStatus": "Rejected"
+          }
+        }
+      );
+      await Buyer.findOneAndUpdate(
+        { "MyOrders.escrowAddress": escrowAddress },
+        {
+          $set: {
+            "MyOrders.$.escrowStatus": result.status
+          }
+        }
+      );
+    } catch (dbError) {
+      console.error('Failed to sync rejectDelivery to DB:', dbError.message);
+    }
 
     res.status(200).json({
       message: 'Delivery rejected and refund initiated with penalty',

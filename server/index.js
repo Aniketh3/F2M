@@ -140,7 +140,7 @@ app.post("/sellerSale", async (req, res) => {
 app.get("/market-view", async (req, res) => {
     try {
         const sellers = await Seller.aggregate([
-            { $project: { Name: 1, PhoneNumber: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $eq: ['$$sell.isTransactionComplete', false] } } } } }
+            { $project: { Name: 1, PhoneNumber: 1, WalletAddress: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $eq: ['$$sell.isTransactionComplete', false] } } } } }
         ]);
         res.status(200).json(sellers);
     } catch (err) { res.status(500).json({ message: "Error" }); }
@@ -151,7 +151,7 @@ app.post("/market-search", async (req, res) => {
     try {
         const { item } = req.body;
         const sellers = await Seller.aggregate([
-            { $project: { Name: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $and: [{ $eq: ['$$sell.isTransactionComplete', false] }, { $eq: [`$$sell.SellItem`, item] }] } } } } }
+            { $project: { Name: 1, WalletAddress: 1, MySellList: { $filter: { input: '$MySellList', as: 'sell', cond: { $and: [{ $eq: ['$$sell.isTransactionComplete', false] }, { $eq: [`$$sell.SellItem`, item] }] } } } } }
         ]);
         res.status(200).json(sellers);
     } catch (err) { res.status(500).json({ message: "Error" }); }

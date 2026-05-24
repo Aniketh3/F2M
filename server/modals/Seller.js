@@ -48,6 +48,19 @@ const sellList = new mongoose.Schema({
     },
     SaleAmount:{
         type:Number
+    },
+    isEscrow:{
+        type:Boolean,
+        default:false
+    },
+    escrowAddress:{
+        type:String,
+        default:null
+    },
+    escrowStatus:{
+        type:String,
+        enum:['Created', 'Active', 'Delivered', 'Completed', 'Rejected', 'Refunded', 'None'],
+        default:'None'
     }
 })
 
@@ -101,8 +114,11 @@ const sellerSchema = new mongoose.Schema({
     Notifications:{
         type:[notificationSchema],
         default:[]
+    },
+    WalletAddress:{
+        type:String,
+        default:null
     }
-
 })
 
 // Name

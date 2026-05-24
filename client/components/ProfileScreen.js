@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Switch, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Switch, Alert, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,6 +39,10 @@ const ProfileScreen = ({ navigation }) => {
   const [completion, setCompletion] = useState(0);
   const [isOnline, setIsOnline] = useState(true);
   const [profileImage, setProfileImage] = useState(null);
+
+  // Custom Modal State for Android-compatible Wallet Editor
+  const [walletModalVisible, setWalletModalVisible] = useState(false);
+  const [tempWalletAddress, setTempWalletAddress] = useState('');
 
   // 🔄 Fetch Data every time screen focuses
   useFocusEffect(
@@ -85,6 +89,7 @@ const ProfileScreen = ({ navigation }) => {
           email: apiData.Email || 'No Email Linked',
           location: apiData.Address || 'India',
           aadhar: apiData.AadharNumber,
+          walletAddress: apiData.WalletAddress || null,
           // Stats
           orders: apiData.stats.orders,
           earnings: userRole === 'seller' ? apiData.stats.earnings : null,
@@ -115,6 +120,47 @@ const ProfileScreen = ({ navigation }) => {
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       }
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWalletPress = () => {
+    setTempWalletAddress(userData?.walletAddress || "");
+    setWalletModalVisible(true);
+  };
+
+  const handleAutoFill = () => {
+    const testAccounts = [
+      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // Backend
+      '0x70997970C51812e339D9B73b0245ad59cc793a05', // Farmer
+      '0x3C44CdDdB6a900c6671B73F3d36ade6d1fF63Af7'  // Buyer
+    ];
+    const randomAccount = testAccounts[Math.floor(Math.random() * testAccounts.length)];
+    setTempWalletAddress(randomAccount);
+  };
+
+  const saveWalletAddress = async () => {
+    const address = tempWalletAddress.trim();
+    if (!address.startsWith('0x') || address.length !== 42) {
+      Alert.alert("Invalid Address", "Wallet address must be a valid 42-character hex string starting with 0x.");
+      return;
+    }
+    try {
+      setLoading(true);
+      setWalletModalVisible(false);
+      const sellerInfo = await AsyncStorage.getItem('sellerInfo');
+      const buyerInfo = await AsyncStorage.getItem('buyerInfo');
+      let token = sellerInfo ? JSON.parse(sellerInfo).token : (buyerInfo ? JSON.parse(buyerInfo).token : null);
+      
+      await axios.put(
+        `${process.env.EXPO_PUBLIC_API_URL}/profile/update`, 
+        { WalletAddress: address },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      Alert.alert("Success", "Wallet address updated successfully!");
+      fetchProfileData();
+    } catch (err) {
+      Alert.alert("Error", "Failed to update wallet address.");
       setLoading(false);
     }
   };
@@ -329,7 +375,8 @@ const ProfileScreen = ({ navigation }) => {
             <View style={styles.menuGroup}>
               <MenuItem icon="smartphone" title={t('phone_number')} subtitle={userData?.phone || t('add')} color={theme.primary} />
               <MenuItem icon="mail" title="Email" subtitle={userData?.email || t('add')} color={theme.primary} />
-              <MenuItem icon="credit-card" title="Aadhar / KYC" subtitle={userData?.aadhar ? t('success') : t('pending')} color={theme.primary} isLast />
+              <MenuItem icon="credit-card" title="Aadhar / KYC" subtitle={userData?.aadhar ? t('success') : t('pending')} color={theme.primary} />
+              <MenuItem icon="lock" title="Ethereum Wallet" subtitle={userData?.walletAddress || 'Tap to set dummy wallet'} color={theme.primary} isLast onPress={handleWalletPress} />
             </View>
           </View>
 
@@ -352,13 +399,44 @@ const ProfileScreen = ({ navigation }) => {
 
         </View>
       </ScrollView>
+
+      {/* Wallet Edit Modal */}
+      <Modal animationType="slide" transparent={true} visible={walletModalVisible} onRequestClose={() => setWalletModalVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <View style={styles.walletModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Link Ethereum Wallet</Text>
+              <TouchableOpacity onPress={() => setWalletModalVisible(false)}>
+                <Feather name="x" size={24} color={COLORS.textSec} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>Mock/Dummy Ethereum Address (0x...)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0x..."
+              value={tempWalletAddress}
+              onChangeText={setTempWalletAddress}
+              autoCapitalize="none"
+              placeholderTextColor="#aaa"
+            />
+            <TouchableOpacity onPress={handleAutoFill} style={{ marginBottom: 16, alignSelf: 'flex-start' }}>
+              <Text style={{ fontSize: 13, color: theme.primary, fontWeight: '600', textDecorationLine: 'underline' }}>
+                💡 Tap here to auto-fill a valid test account
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.submitBtn, { backgroundColor: theme.primary }]} onPress={saveWalletAddress}>
+              <Text style={styles.submitBtnText}>Link Wallet</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 };
 
 // 🛠 MINI COMPONENT: MENU ITEM
-const MenuItem = ({ icon, title, subtitle, color, isLast }) => (
-  <TouchableOpacity style={[styles.menuItem, isLast && styles.menuItemLast]} activeOpacity={0.7}>
+const MenuItem = ({ icon, title, subtitle, color, isLast, onPress }) => (
+  <TouchableOpacity style={[styles.menuItem, isLast && styles.menuItemLast]} activeOpacity={0.7} onPress={onPress}>
     <View style={[styles.menuIconBox, { backgroundColor: '#F8FAFC' }]}>
       <Feather name={icon} size={18} color={color} />
     </View>
@@ -667,6 +745,41 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#CBD5E1',
     marginBottom: 40,
+  },
+  walletModalContent: {
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMain,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 50,
+    marginBottom: 16,
+    fontSize: 16,
+    color: COLORS.textMain,
+  },
+  submitBtn: {
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

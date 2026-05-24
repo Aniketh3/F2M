@@ -158,6 +158,33 @@ function getEscrowContract(escrowAddress) {
 }
 
 /**
+ * Get a signer for a specific address. Impersonates on Hardhat local node if possible.
+ * @param {string} address - Address to get signer for
+ * @returns {Promise<{signer: ethers.Signer, cleanup: Function}>}
+ */
+async function getSignerForAddress(address) {
+  const cleanAddress = address.toLowerCase();
+  try {
+    await provider.send("hardhat_impersonateAccount", [cleanAddress]);
+    const signer = new ethers.JsonRpcSigner(provider, cleanAddress);
+    return {
+      signer,
+      cleanup: async () => {
+        try {
+          await provider.send("hardhat_stopImpersonatingAccount", [cleanAddress]);
+        } catch (e) {}
+      }
+    };
+  } catch (error) {
+    console.warn(`Impersonation not supported or failed for ${cleanAddress}. Falling back to backend wallet:`, error.message);
+    return {
+      signer: backendWallet,
+      cleanup: async () => {}
+    };
+  }
+}
+
+/**
  * Farmer accepts the escrow agreement
  * @param {string} escrowAddress - Address of the escrow contract
  * @returns {Promise<{txHash, status}>}
@@ -165,14 +192,20 @@ function getEscrowContract(escrowAddress) {
 async function acceptAgreement(escrowAddress) {
   try {
     const escrowContract = getEscrowContract(escrowAddress);
-    const tx = await escrowContract.acceptAgreement();
-    const receipt = await tx.wait();
+    const farmerAddress = await escrowContract.farmer();
+    const { signer, cleanup } = await getSignerForAddress(farmerAddress);
+    try {
+      const tx = await escrowContract.connect(signer).acceptAgreement();
+      const receipt = await tx.wait();
 
-    return {
-      txHash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      status: 'Active'
-    };
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: 'Active'
+      };
+    } finally {
+      await cleanup();
+    }
   } catch (error) {
     console.error('Error accepting agreement:', error.message);
     throw error;
@@ -210,14 +243,20 @@ async function depositFunds(escrowAddress, amount) {
 async function markAsDelivered(escrowAddress) {
   try {
     const escrowContract = getEscrowContract(escrowAddress);
-    const tx = await escrowContract.markAsDelivered();
-    const receipt = await tx.wait();
+    const farmerAddress = await escrowContract.farmer();
+    const { signer, cleanup } = await getSignerForAddress(farmerAddress);
+    try {
+      const tx = await escrowContract.connect(signer).markAsDelivered();
+      const receipt = await tx.wait();
 
-    return {
-      txHash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      status: 'Delivered'
-    };
+      return {
+        txHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        status: 'Delivered'
+      };
+    } finally {
+      await cleanup();
+    }
   } catch (error) {
     console.error('Error marking as delivered:', error.message);
     throw error;

@@ -30,6 +30,19 @@ const orders = new mongoose.Schema({
     },
     isItemDelivered:{
         type:Boolean
+    },
+    isEscrow:{
+        type:Boolean,
+        default:false
+    },
+    escrowAddress:{
+        type:String,
+        default:null
+    },
+    escrowStatus:{
+        type:String,
+        enum:['Created', 'Active', 'Delivered', 'Completed', 'Rejected', 'Refunded', 'None'],
+        default:'None'
     }
 })
 
@@ -80,6 +93,10 @@ MyOrders:{
 Notifications:{
     type:[buyerNotificationSchema],
     default:[]
+},
+WalletAddress:{
+    type:String,
+    default:null
 }
 })
 
